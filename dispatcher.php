@@ -65,10 +65,10 @@ foreach ($configs as $site => $config) {
             ['Content-Type' => 'application/json', 'Accept' => 'application/json'],
             $payload
         );
-    } catch (Exception $e) {
-        echo "Error processing site $site: " . $e->getMessage() . PHP_EOL;
-        // TODO: Log errors to storage/logs
 
+        echo "Successful fired syncbet site $site with check " . count($mids) . "merchants." . PHP_EOL;
+    } catch (Exception $e) {
+        echo "Error processing site $site: " . $e->getMessage() . PHP_EOL; // TODO: Log Errors
         continue; // Skip to the next site on error
     }
 }

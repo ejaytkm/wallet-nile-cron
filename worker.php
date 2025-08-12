@@ -155,7 +155,7 @@ $server->on('Request', function ($req, $res) use ($maxConc, $globalRps) {
             });
         }
 
-//        $wg->wait();
+        // do not wait $wg->wait();
         ksort($results);
         $ok = 0; $errc = 0;
         foreach ($results as $r) isset($r['error']) || ($r['status'] ?? 0) >= 400 ? $errc++ : $ok++;
