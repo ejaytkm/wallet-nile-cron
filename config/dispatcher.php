@@ -13,8 +13,6 @@ return [
 
     'worker_nodes' => [
         ['host' => '10.0.1.10', 'port' => 9501],
-        ['host' => '10.0.1.11', 'port' => 9501],
-        ['host' => '10.0.1.12', 'port' => 9501],
-        // Add more worker nodes as needed
+        ['host' => '10.0.1.11', 'port' => 9501]
     ],
 ];
