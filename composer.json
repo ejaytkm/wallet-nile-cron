@@ -1,0 +1,25 @@
+{
+  "name": "swoole/high-concurrency-app",
+  "description": "High-performance Swoole application with 100k coroutines support",
+  "require": {
+    "php": "^8.3",
+    "ext-swoole": ">=5.0",
+    "ext-pdo": "*",
+    "ext-json": "*",
+    "vlucas/phpdotenv": "^5.6",
+    "ext-curl": "*",
+    "nesbot/carbon": "^3.10",
+    "guzzlehttp/guzzle": "^7.9"
+  },
+  "autoload": {
+    "psr-4": {
+      "App\\": "src/"
+    }
+  },
+  "scripts": {
+    "post-install-cmd": [
+      "echo 'Run: php worker.php to start a worker instance'",
+      "echo 'Run: php dispatcher.php run to start the dispatcher'"
+    ]
+  }
+}

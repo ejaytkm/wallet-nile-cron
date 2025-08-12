@@ -1,0 +1,50 @@
+name: swoole-cron-job
+services:
+  swoole-worker-1:
+    container_name: swoole-worker-1
+    build:
+      context: ./php
+      dockerfile: Dockerfile
+    networks:
+      - evalink
+    extra_hosts:
+      - "server.wallet.xdev:172.17.0.1" # Replace 172.17.0.1 with the IP you found
+    environment:
+      - SWOOLE_PORT=9501
+      - THROTTLE_RPS=1000
+      - PHP_IDE_CONFIG=serverName=LOCAL_PHP_DEFAULT
+      - XDEBUG_MODE=${XDEBUG_MODE}
+      # Optional: uncomment if your worker.php reads these
+      # - MAX_COROUTINES=100000
+      # - MAX_CONCURRENCY=2000
+      # - GLOBAL_RPS=5000
+    working_dir: /var/app/current
+    volumes:
+      - ../:/var/app/current
+    command: php worker.php
+    ports:
+      - "9501:9501"
+
+  dispatcher:
+    container_name: dispatcher
+    build:
+      context: ./php
+      dockerfile: Dockerfile
+    networks:
+        - evalink
+    environment:
+      - WORKER_NODES=swoole-worker-1:9501
+      - PHP_IDE_CONFIG=serverName=LOCAL_PHP_DEFAULT
+      - XDEBUG_MODE=${XDEBUG_MODE}
+    depends_on:
+      - swoole-worker-1
+    working_dir: /var/app/current
+    volumes:
+      - ../:/var/app/current
+    command: tail -f /dev/null
+  # command to set cronjob or supervisor to run the dispatcher
+  # command: php dispatcher.php run
+
+networks:
+  evalink:
+    external: true

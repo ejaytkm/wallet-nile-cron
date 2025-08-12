@@ -1,0 +1,175 @@
+<?php
+declare(strict_types=1);
+
+require __DIR__ . '/vendor/autoload.php';
+require __DIR__ . '/src/Bootstrap.php';
+
+use App\Utils\GuzzleUtil;
+use Swoole\Runtime;
+use Swoole\Http\Server;
+use Swoole\Constant;
+use App\Utils\RateLimiter;
+use App\Utils\Semaphore;
+
+// Enable coroutine hooks BUT avoid native cURL so we rely on Guzzle StreamHandler (no Swoole-OpenSSL requirement)
+if (!defined('SWOOLE_HOOK_ALL')) define('SWOOLE_HOOK_ALL', 0xFFFFFF);
+if (!defined('SWOOLE_HOOK_NATIVE_CURL')) define('SWOOLE_HOOK_NATIVE_CURL', 0x2000);
+Runtime::enableCoroutine(SWOOLE_HOOK_ALL ^ SWOOLE_HOOK_NATIVE_CURL);
+
+// Env via global env() from Bootstrap
+$host      = env('SERVER_HOST', '0.0.0.0');
+$port      = (int) env('SERVER_PORT', 9501);
+$maxCo     = (int) env('MAX_COROUTINES', 100000);
+$maxConc   = (int) env('MAX_CONCURRENCY', 2000);
+$globalRps = env('GLOBAL_RPS') !== null ? (float) env('GLOBAL_RPS') : null;
+
+$server = new Server($host, $port, SWOOLE_BASE);
+$server->set([
+    Constant::OPTION_MAX_COROUTINE       => $maxCo,
+    Constant::OPTION_WORKER_NUM          => max(1, (int) env('WORKER_NUM', swoole_cpu_num() * 2)),
+    Constant::OPTION_TASK_WORKER_NUM     => (int) env('TASK_WORKER_NUM', 0),
+    Constant::OPTION_LOG_LEVEL           => SWOOLE_LOG_INFO,
+    Constant::OPTION_ENABLE_COROUTINE    => true,
+    Constant::OPTION_OPEN_HTTP2_PROTOCOL => true,
+    Constant::OPTION_BUFFER_OUTPUT_SIZE  => 64 * 1024 * 1024,
+    Constant::OPTION_SOCKET_BUFFER_SIZE  => 8 * 1024 * 1024,
+]);
+
+$server->on('Request', function ($req, $res) use ($maxConc, $globalRps) {
+    $uri    = $req->server['request_uri']    ?? '/';
+    $method = $req->server['request_method'] ?? 'GET';
+
+    if ($uri === '/health') {
+        $res->header('Content-Type', 'application/json');
+        $res->end(json_encode(['ok' => true, 'time' => time()]));
+        return;
+    }
+
+    // Accept site/module/mids payload; keep /batch alias for convenience
+    if (($uri === '/batch' || $uri === '/batch/syncbet') && $method === 'POST') {
+        $payload = json_decode($req->rawContent() ?: '[]', true) ?: [];
+
+        $site    = isset($payload['site'])   ? (string)$payload['site']   : '';
+        $module  = isset($payload['module']) ? (string)$payload['module'] : '';
+        $mids    = isset($payload['mids']) && is_array($payload['mids']) ? $payload['mids'] : [];
+
+        $timeout = (float)($payload['timeout'] ?? 15);
+        $retry   = (int)($payload['retry']   ?? 1);
+
+        // Validate
+        if ($site === '' || $module === '' || empty($mids)) {
+            $res->status(400);
+            $res->header('Content-Type', 'application/json');
+            $res->end(json_encode([
+                'error' => 'Invalid payload: require "site" (string), "module" (string), and "mids" (array).'
+            ]));
+            return;
+        }
+
+        // Wallet endpoint & creds from env
+        $walletUrl   = env('WALLET_URL') . '/api/v1/index.php';
+        $accessId    = env('SYSTEM_ADMIN_ACCESS_ID', '');
+        $accessToken = env('SYSTEM_ADMIN_TOKEN', '');
+        $cronJobId   = isset($payload['cronJobId']) ? (int)$payload['cronJobId'] : null;
+
+        if ($accessId === '' || $accessToken === '') {
+            $res->status(500);
+            $res->header('Content-Type', 'application/json');
+            $res->end(json_encode([
+                'error' => 'SERVER_MISCONFIGURED',
+                'message' => 'Missing SYSTEM_ADMIN_ACCESS_ID or SYSTEM_ADMIN_TOKEN in env.'
+            ]));
+            return;
+        }
+
+        // Throttling
+        $sem            = new Semaphore($maxConc);
+        $globalLimiter  = $globalRps ? new RateLimiter($globalRps, 100) : null;
+        $perHostLimiter = [];
+        $hostName       = parse_url($walletUrl, PHP_URL_HOST) ?: '';
+        $perHostRpsEnv  = env('PER_HOST_RPS'); // optional
+        if ($hostName !== '' && $perHostRpsEnv !== null && $perHostRpsEnv !== '') {
+            $perHostLimiter[$hostName] = new RateLimiter((float)$perHostRpsEnv, 100);
+        }
+
+        // Guzzle helper
+        $http = new GuzzleUtil();
+
+        // Build jobs (one POST per mid)
+        $jobs = [];
+        foreach ($mids as $mid) {
+            $jobs[] = [
+                'url'  => $walletUrl,
+                'data' => array_filter([
+                    'module'         => '/betHistory/' . $module, // e.g. /betHistory/jili
+                    'accessId'       => $accessId,
+                    'accessToken'    => $accessToken,
+                    'nonTransaction' => 1,
+                    'site'           => $site,
+                    'cronJobId'      => $cronJobId,
+                ], static fn($v) => $v !== null),
+            ];
+        }
+
+        // TODO: Implement some database - get all jobs tied to $mid and $module
+
+        // Run jobs concurrently (coroutines), using Guzzle StreamHandler
+        $wg      = new Swoole\Coroutine\WaitGroup();
+        $results = [];
+        $summary  = [
+            'total' => count($jobs),
+            'wait' => false
+        ];
+
+        foreach ($jobs as $idx => $job) {
+            $wg->add();
+            go(function () use ($idx, $job, $retry, $sem, $globalLimiter, $perHostLimiter, $hostName, $http, &$results, $wg) {
+                $sem->acquire();
+                try {
+                    if ($globalLimiter) $globalLimiter->take();
+                    if ($hostName && isset($perHostLimiter[$hostName])) $perHostLimiter[$hostName]->take();
+
+                    $attempt = 0; $resp = null;
+                    while ($attempt <= $retry) {
+                        $attempt++;
+                        $resp = $http->execute('POST',
+                            $job['url'],
+                            ['Content-Type' => 'application/x-www-form-urlencoded'],
+                            $job['data']
+                        );
+
+                        if (!isset($resp['error']) && ($resp['status'] >= 200 && $resp['status'] < 500)) {
+                            break;
+                        }
+
+                        Swoole\Coroutine::sleep(
+                            min(1.0 * $attempt, 5.0) * (0.5 + mt_rand() / mt_getrandmax())
+                        );
+                    }
+
+                    $results[$idx] = $resp;
+                } finally {
+                    $sem->release();
+                    $wg->done();
+                }
+            });
+        }
+
+//        $wg->wait();
+        ksort($results);
+        $ok = 0; $errc = 0;
+        foreach ($results as $r) isset($r['error']) || ($r['status'] ?? 0) >= 400 ? $errc++ : $ok++;
+        $res->header('Content-Type', 'application/json');
+        $res->end(json_encode([
+            'ok' => $ok,
+            'err' => $errc,
+            'results' => $results ?: $summary
+        ], JSON_UNESCAPED_SLASHES));
+        return;
+    }
+
+    $res->status(404);
+    $res->end('Not found');
+});
+
+$server->start();

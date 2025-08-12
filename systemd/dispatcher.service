@@ -1,0 +1,14 @@
+[Unit]
+Description=Swoole Dispatcher
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/var/app/current
+ExecStart=/usr/bin/php /var/app/current/dispatcher.php
+Restart=on-failure
+RestartSec=5
+Environment=WORKER_LB_URL=http://localhost:8080/batch DISPATCH_BATCH=10000 TARGET_TIMEOUT=10 TARGET_RETRY=1 PER_HOST_RPS=2000
+
+[Install]
+WantedBy=multi-user.target

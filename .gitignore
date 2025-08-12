@@ -1,0 +1,10 @@
+vendor
+node_modules
+.DS_Store
+.idea
+.vscode
+npm-debug.log
+Thumbs.db
+.phpunit.result.cache
+.env
+.env.example
