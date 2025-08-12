@@ -7,4 +7,3 @@ npm-debug.log
 Thumbs.db
 .phpunit.result.cache
 .env
-.env.example

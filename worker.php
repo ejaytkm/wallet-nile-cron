@@ -112,6 +112,7 @@ $server->on('Request', function ($req, $res) use ($maxConc, $globalRps) {
         }
 
         // TODO: Implement some database - get all jobs tied to $mid and $module
+        // TODO: Throttling - use Semaphore and RateLimiter to limit concurrency and RPS
 
         // Run jobs concurrently (coroutines), using Guzzle StreamHandler
         $wg      = new Swoole\Coroutine\WaitGroup();
@@ -145,6 +146,8 @@ $server->on('Request', function ($req, $res) use ($maxConc, $globalRps) {
                         Swoole\Coroutine::sleep(
                             min(1.0 * $attempt, 5.0) * (0.5 + mt_rand() / mt_getrandmax())
                         );
+
+                        // Fire HTTP back to worker server to MARK as success
                     }
 
                     $results[$idx] = $resp;
