@@ -2,9 +2,13 @@
 
 Massively concurrent cURL using Swoole coroutines with throttling (global/per-host), plus a simple dispatcher.
 
-## Quickstart (Docker)
+## Environment
+See `/environment/` for how to set up and download packages for full environment.
+
+# Installation
+## Docker
+Start the PHP environment with Docker:
 ```bash
-cd docker
-docker compose up --build -d
-# In another shell:
-docker compose exec app php /app/dispatcher.php
+make build
+```
+

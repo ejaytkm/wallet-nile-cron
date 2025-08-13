@@ -32,6 +32,3 @@ COPY ${php_path}/php.ini /usr/local/etc/php/conf.d/php.ini
 COPY ${php_path}/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 # FIXED destination path here (was split as /usr/lo cal/...)
 COPY ${php_path}/xdebug.ini /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini
-
-# Default command (overridden by docker-compose)
-CMD ["php", "-v"]

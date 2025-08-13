@@ -11,9 +11,6 @@ use Swoole\Constant;
 use App\Utils\RateLimiter;
 use App\Utils\Semaphore;
 
-// Enable coroutine hooks BUT avoid native cURL so we rely on Guzzle StreamHandler (no Swoole-OpenSSL requirement)
-if (!defined('SWOOLE_HOOK_ALL')) define('SWOOLE_HOOK_ALL', 0xFFFFFF);
-if (!defined('SWOOLE_HOOK_NATIVE_CURL')) define('SWOOLE_HOOK_NATIVE_CURL', 0x2000);
 Runtime::enableCoroutine(SWOOLE_HOOK_ALL ^ SWOOLE_HOOK_NATIVE_CURL);
 
 // Env via global env() from Bootstrap
@@ -46,15 +43,12 @@ $server->on('Request', function ($req, $res) use ($maxConc, $globalRps) {
     }
 
     // Accept site/module/mids payload; keep /batch alias for convenience
-    if (($uri === '/batch' || $uri === '/batch/syncbet') && $method === 'POST') {
+    if ($uri === '/batch/sync_bet' && $method === 'POST') {
         $payload = json_decode($req->rawContent() ?: '[]', true) ?: [];
 
         $site    = isset($payload['site'])   ? (string)$payload['site']   : '';
         $module  = isset($payload['module']) ? (string)$payload['module'] : '';
         $mids    = isset($payload['mids']) && is_array($payload['mids']) ? $payload['mids'] : [];
-
-        $timeout = (float)($payload['timeout'] ?? 15);
-        $retry   = (int)($payload['retry']   ?? 1);
 
         // Validate
         if ($site === '' || $module === '' || empty($mids)) {
@@ -95,10 +89,19 @@ $server->on('Request', function ($req, $res) use ($maxConc, $globalRps) {
         // Guzzle helper
         $http = new GuzzleUtil();
 
-        // Build jobs (one POST per mid)
-        $jobs = [];
+        // @TODO: Implement some database - get all jobs tied to $mid and $module
+        // @TODO: Throttling - use Semaphore and RateLimiter to limit concurrency and RPS
+
+        $wg      = new Swoole\Coroutine\WaitGroup();
+        $results = [];
+        $summary  = [
+            'total' => count($mids),
+            'wait' => false
+        ];
+
+        // @TODO: Get cron jobs and store into memory
         foreach ($mids as $mid) {
-            $jobs[] = [
+            $job = [
                 'url'  => $walletUrl,
                 'data' => array_filter([
                     'module'         => '/betHistory/' . $module, // e.g. /betHistory/jili
@@ -109,22 +112,9 @@ $server->on('Request', function ($req, $res) use ($maxConc, $globalRps) {
                     'cronJobId'      => $cronJobId,
                 ], static fn($v) => $v !== null),
             ];
-        }
 
-        // TODO: Implement some database - get all jobs tied to $mid and $module
-        // TODO: Throttling - use Semaphore and RateLimiter to limit concurrency and RPS
-
-        // Run jobs concurrently (coroutines), using Guzzle StreamHandler
-        $wg      = new Swoole\Coroutine\WaitGroup();
-        $results = [];
-        $summary  = [
-            'total' => count($jobs),
-            'wait' => false
-        ];
-
-        foreach ($jobs as $idx => $job) {
             $wg->add();
-            go(function () use ($idx, $job, $retry, $sem, $globalLimiter, $perHostLimiter, $hostName, $http, &$results, $wg) {
+            go(function () use ($mid, $job, $retry, $sem, $globalLimiter, $perHostLimiter, $hostName, $http, &$results, $wg) {
                 $sem->acquire();
                 try {
                     if ($globalLimiter) $globalLimiter->take();
@@ -147,10 +137,10 @@ $server->on('Request', function ($req, $res) use ($maxConc, $globalRps) {
                             min(1.0 * $attempt, 5.0) * (0.5 + mt_rand() / mt_getrandmax())
                         );
 
-                        // Fire HTTP back to worker server to MARK as success
+                        // @TODO: Fire HTTP back to worker server to MARK as success
                     }
 
-                    $results[$idx] = $resp;
+                    $results[$mid] = $resp;
                 } finally {
                     $sem->release();
                     $wg->done();
@@ -174,5 +164,5 @@ $server->on('Request', function ($req, $res) use ($maxConc, $globalRps) {
     $res->status(404);
     $res->end('Not found');
 });
-
+echo "Swoole HTTP server started at http://{$host}:{$port}\n";
 $server->start();

@@ -18,8 +18,8 @@
   },
   "scripts": {
     "post-install-cmd": [
-      "echo 'Run: php worker.php to start a worker instance'",
-      "echo 'Run: php dispatcher.php run to start the dispatcher'"
+      "echo 'Run: php server.php to start a worker instance'",
+      "echo 'Run: php exec/syncbethistory.php run to start the dispatcher'"
     ]
   }
 }

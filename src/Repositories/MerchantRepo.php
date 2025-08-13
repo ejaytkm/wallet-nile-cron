@@ -1,16 +1,39 @@
 <?php
 declare(strict_types=1);
 
-namespace App\Providers;
+namespace App\Repositories;
 
 use App\Database\PDOAbstract;
 use Carbon\Carbon;
+use PDO;
 
-final class SyncBetActivity
+final class MerchantRepo
 {
     public function __construct(
-        private PDOAbstract $db
-    ) {}
+        private ?PDOAbstract $db = null
+    ) {
+        if ($db === null) {
+            $this->db = new PDOAbstract(
+                new PDO(
+                    env('DB_MERCHANT_DSN'),
+                    env('DB_MERCHANT_USER'),
+                    env('DB_MERCHANT_PASS')
+                )
+            );
+        }
+    }
+
+    public function fetchAllActiveMerchants(): array
+    {
+        $sql = "SELECT id FROM merchants WHERE status = :status";
+        $data = $this->db->select($sql, ['status' => 'ACTIVE'], PDO::FETCH_COLUMN);
+        return $data;
+    }
+
+    public function fetchAllAcitvePwdForMerchant(): array
+    {
+        return [];
+    }
 
     /**
      * Fetch distinct active merchant IDs bound to a PWD site,
@@ -20,15 +43,16 @@ final class SyncBetActivity
      * @param string $startTime   ISO-8601 string you pass into the downstream job
      * @param int    $hoursBack   how many hours back to scan (default 4)
      */
-    public function fetchActiveMerchantIdsForPwdSite(
+    public function fetchActiveSitesForMerchant(
         string $site,
         string $startTime,
-        int $hoursBack = 4
+        int $hoursBack = 2
     ): array {
         if ($site === '') {
             throw new \InvalidArgumentException('Site parameter cannot be empty.');
         }
 
+        // @TODO: Cache this result for performance
         $merchantIds = $this->getActiveMerchantIdsForPwdSites($site);
         if (!$merchantIds) {
             return [];
@@ -44,9 +68,6 @@ final class SyncBetActivity
         );
     }
 
-    /**
-     * @return int[] merchant IDs
-     */
     private function getActiveMerchantIdsForPwdSites(string $site): array
     {
         $sql = <<<SQL
