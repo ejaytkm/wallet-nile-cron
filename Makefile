@@ -39,5 +39,5 @@ docker@restart:
 
 
 ## COMMANDS
-app@cron-sync-bet:
-	@docker exec -it wallet-nile-cron php cron/syncbethistory.php
+app@sync_bet_history:
+	@docker exec -it wallet-nile-cron php crond/sync_bet_history.php

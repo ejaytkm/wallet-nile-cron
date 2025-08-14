@@ -15,11 +15,11 @@ services:
     extra_hosts:
       - "server.wallet.xdev:172.17.0.1" # Replace 172.17.0.1 with the IP you found
     working_dir: /var/app/current
-    command: sh startup.sh
     ports:
-      - "9501:9501" # Swoole default port
-      - "2112:2112" # Metrics port
-
+      - "9501:9501" # server port
+      - "2112:2112" # metrics port
+#    command: tail -f > /dev/null # Keep the container running
+    command: sh startup.sh
 networks:
   evalink:
     name: evalink

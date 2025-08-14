@@ -1,5 +1,10 @@
 <?php
+
+use App\Container\ContainerFactory;
+use App\Logger\LoggerFactory;
 use Dotenv\Dotenv;
+use Monolog\Logger;
+use Psr\Log\LoggerInterface;
 
 $startTime = microtime(true);
 echo "Loading bootstrap...\n";
@@ -15,8 +20,6 @@ date_default_timezone_set('UTC');
 
 if (!defined('SWOOLE_HOOK_ALL')) define('SWOOLE_HOOK_ALL', 0xFFFFFF);
 if (!defined('SWOOLE_HOOK_NATIVE_CURL')) define('SWOOLE_HOOK_NATIVE_CURL', 0x2000);
-
-// singletons containers
 
 function cacheDataFile()
 {
@@ -45,5 +48,14 @@ function cacheDataFile()
 
     return $data;
 }
+
+$container = ContainerFactory::build();
+$logger = LoggerFactory::build(
+    'wallet-nile-cron',
+    __DIR__ . '/../storage/logs/app.log',
+    Logger::INFO
+);
+$container->set(LoggerInterface::class, $logger);
+// HELPER FUNCTIONS
 
 echo "Bootstrap loaded in " . (microtime(true) - $startTime) . " seconds.\n";
