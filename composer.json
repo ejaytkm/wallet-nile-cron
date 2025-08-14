@@ -10,7 +10,9 @@
     "ext-curl": "*",
     "nesbot/carbon": "^3.10",
     "guzzlehttp/guzzle": "^7.9",
-    "promphp/prometheus_client_php": "^2.9"
+    "promphp/prometheus_client_php": "^2.9",
+    "nikic/fast-route": "^1.3",
+    "psr/container": "^2.0"
   },
   "autoload": {
     "psr-4": {
