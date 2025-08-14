@@ -26,12 +26,12 @@ app@clean-cache:
 	@printf "Cache cleaned successfully.\n"
 
 app@swole-version:
-	@docker exec -it app php -r "echo swoole_version();"
+	@docker exec -it wallet-nile-cron php -r "echo swoole_version();"
 	@printf "\nSwoole version displayed successfully."
 
 ## DOCKER
 docker@tail-logs:
-	@docker logs -f app
+	@docker logs -f wallet-nile-cron
 
 docker@restart:
 	@docker restart wallet-nile-cron
@@ -40,4 +40,4 @@ docker@restart:
 
 ## COMMANDS
 app@cron-sync-bet:
-	@docker exec -it app php cron/syncbethistory.php
+	@docker exec -it wallet-nile-cron php cron/syncbethistory.php

@@ -1,10 +1,10 @@
 <?php
 declare(strict_types=1);
-namespace App\Infra;
+namespace App\Database;
 use PDO;
 use Swoole\Coroutine\Channel;
 
-final class PdoPool {
+final class PDOPool {
     private Channel $chan;
     public function __construct(int $size = 32) {
         $this->chan = new Channel($size);

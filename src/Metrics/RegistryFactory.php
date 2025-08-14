@@ -26,7 +26,6 @@ final class RegistryFactory
         $m['httpReqs']     = $reg->getOrRegisterCounter('ss_http','request_total','HTTP requests',['method','code']);
         $m['httpLatency']  = $reg->getOrRegisterHistogram('ss_http','request_duration_seconds','HTTP request duration',['method','code'],[0.005,0.01,0.025,0.05,0.1,0.25,0.5,1,2,5,10]);
         $m['httpUptime']   = $reg->getOrRegisterGauge('ss_http','uptime_seconds','Server uptime seconds');
-        $m['inflight']     = $reg->getOrRegisterGauge('ss_http','requests_inflight','In-flight HTTP requests');
         $m['queue']        = $reg->getOrRegisterGauge('ss_http','requests_queue','Queued/in-flight HTTP requests');
 
         // Workers & connections (stats()-driven)

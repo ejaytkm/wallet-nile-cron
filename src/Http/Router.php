@@ -10,7 +10,9 @@ final class Router {
     public function __construct() {
         $this->d = simpleDispatcher(function (RouteCollector $r) {
             $r->addRoute('GET',  '/health',  [Controllers\HealthController::class, 'index']);
-            $r->addRoute('GET',  '/metrics', [Controllers\MetricsController::class, 'expose']);
+            $r->addRoute('GET',  '/stats',  [Controllers\HealthController::class, 'stats']);
+
+            $r->addRoute('GET', '/test', [Controllers\TestController::class, 'index']);
             $r->addRoute('POST', '/batch/syncbet', [Controllers\JobsController::class, 'syncBet']);
         });
     }

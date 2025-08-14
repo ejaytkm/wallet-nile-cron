@@ -5,20 +5,25 @@ use App\Domain\Jobs\SyncService;
 use Swoole\Coroutine;
 use Swoole\Coroutine\WaitGroup;
 use Swoole\Http\Response;
+use Swoole\Http\Request;
 
 final class JobsController {
     public function __construct(private SyncService $svc) {}
-    public function syncBet(array $req, Response $res): void {
-        $p = $req['json'] ?? [];
-        $site   = (string)($p['site'] ?? '');
-        $module = (string)($p['module'] ?? '');
-        $mids   = (array)  ($p['mids'] ?? []);
+    public function syncBet(Request $req, Response $res): void {
+//        $p = $req['json'] ?? [];
+//        $site   = (string)($p['site'] ?? '');
+//        $module = (string)($p['module'] ?? '');
+//        $mids   = (array)  ($p['mids'] ?? []);
+
+        die('{"status":"error","error":"not implemented"}');
+
         if ($site === '' || $module === '' || !$mids) {
             $res->status(400);
             $res->header('Content-Type','application/json');
             $res->end(json_encode(['status'=>'error','error'=>'invalid payload']));
             return;
         }
+
         $wg = new WaitGroup();
         foreach ($mids as $mid) {
             $wg->add();

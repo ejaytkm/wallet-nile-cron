@@ -1,10 +1,10 @@
 <?php
 declare(strict_types=1);
 namespace App\Domain\Jobs;
-use App\Infra\PdoPool;
+use App\Database\PDOPool;
 
 final class SyncService {
-    public function __construct(private PdoPool $pool) {}
+    public function __construct(private PDOPool $pool) {}
     public function process(string $module, string $site, int $mid): void {
         $pdo = $this->pool->borrow();
         try {

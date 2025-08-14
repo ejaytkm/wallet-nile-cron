@@ -17,122 +17,126 @@
     { "type": "panel", "id": "timeseries", "name": "Time series", "version": "" },
     { "type": "panel", "id": "gauge", "name": "Gauge", "version": "" }
   ],
-  "title": "Swoole / ss_* Dashboard (stats())",
-  "uid": "SSWOOLE_MAIN",
+  "title": "Swoole / ss_* (multi-instance, multi-worker)",
+  "uid": "SSWOOLE_MULTI",
   "schemaVersion": 36,
   "style": "dark",
   "editable": true,
   "refresh": "5s",
   "time": { "from": "now-30m", "to": "now" },
-  "annotations": { "list": [] },
+  "templating": {
+    "list": [
+      {
+        "name": "job",
+        "type": "query",
+        "datasource": "${DS_PROMETHEUS}",
+        "query": "label_values(ss_http_uptime_seconds, job)",
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true
+      },
+      {
+        "name": "instance",
+        "type": "query",
+        "datasource": "${DS_PROMETHEUS}",
+        "query": "label_values(ss_http_uptime_seconds{job=~\"$job\"}, instance)",
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true
+      }
+    ]
+  },
   "panels": [
     {
-      "id": 1, "type": "stat", "title": "Uptime",
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "id": 1, "type": "stat", "title": "Cluster Uptime (min across instances)",
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "ss_http_uptime_seconds", "instant": true, "refId": "A" }],
+      "targets": [{ "expr": "min(ss_http_uptime_seconds{job=~\"$job\",instance=~\"$instance\"})", "instant": true, "refId": "A" }],
       "fieldConfig": { "defaults": { "unit": "s" } }
     },
     {
-      "id": 2, "type": "bargauge", "title": "Workers",
-      "gridPos": { "h": 4, "w": 10, "x": 6, "y": 0 },
+      "id": 2, "type": "stat", "title": "Workers (total across instances)",
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "sum(ss_http_total_workers{job=~\"$job\",instance=~\"$instance\"})", "instant": true, "refId": "A" }]
+    },
+    {
+      "id": 3, "type": "bargauge", "title": "Workers by instance (total / active / idle)",
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "options": { "displayMode": "lcd" },
       "targets": [
-        { "expr": "ss_http_total_workers",  "refId": "A", "legendFormat": "Total" },
-        { "expr": "ss_http_workers_active", "refId": "B", "legendFormat": "Active" },
-        { "expr": "ss_http_workers_idle",   "refId": "C", "legendFormat": "Idle" }
+        { "expr": "sum by (instance)(ss_http_total_workers{job=~\"$job\",instance=~\"$instance\"})",  "refId": "A", "legendFormat": "{{instance}} total" },
+        { "expr": "sum by (instance)(ss_http_workers_active{job=~\"$job\",instance=~\"$instance\"})", "refId": "B", "legendFormat": "{{instance}} active" },
+        { "expr": "sum by (instance)(ss_http_workers_idle{job=~\"$job\",instance=~\"$instance\"})",   "refId": "C", "legendFormat": "{{instance}} idle" }
       ]
     },
-    {
-      "id": 3, "type": "stat", "title": "User Workers",
-      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "ss_http_workers_user_total", "instant": true, "refId": "A" }]
-    },
-    {
-      "id": 4, "type": "gauge", "title": "Task Workers",
-      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "ss_http_workers_task_total", "refId": "A" }],
-      "fieldConfig": { "defaults": { "min": 0 } }
-    },
-    {
-      "id": 5, "type": "stat", "title": "Reload count",
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 4 },
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "ss_http_reload_count", "instant": true, "refId": "A" }]
-    },
-    {
-      "id": 6, "type": "stat", "title": "Latest reload time",
-      "gridPos": { "h": 4, "w": 18, "x": 6, "y": 4 },
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "ss_http_latest_reload_timestamp", "instant": true, "refId": "A" }],
-      "fieldConfig": { "defaults": { "unit": "s" } }
-    },
 
-    { "type": "row", "title": "Main", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 8 }, "collapsed": false, "id": 7 },
+    { "type": "row", "title": "Traffic & Coroutines", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 4 }, "collapsed": false, "id": 10 },
 
     {
-      "id": 8, "type": "timeseries", "title": "RPM",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+      "id": 11, "type": "timeseries", "title": "Requests per minute (cluster total)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 5 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
-        { "expr": "rate(ss_http_request_total[1m]) * 60", "refId": "A", "legendFormat": "requests/min" },
-        { "expr": "rate(ss_http_dispatch_total[1m]) * 60", "refId": "B", "legendFormat": "dispatch/min (fallback)" }
+        { "expr": "sum(rate(ss_http_request_total{job=~\"$job\",instance=~\"$instance\"}[1m])) * 60", "refId": "A", "legendFormat": "req/min" },
+        { "expr": "sum(rate(ss_http_dispatch_total{job=~\"$job\",instance=~\"$instance\"}[1m])) * 60", "refId": "B", "legendFormat": "dispatch/min" }
       ],
       "fieldConfig": { "defaults": { "unit": "ops" } }
     },
     {
-      "id": 9, "type": "timeseries", "title": "Coroutines Number",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "swoole_coroutines", "refId": "A", "legendFormat": "Active" }]
-    },
-    {
-      "id": 10, "type": "timeseries", "title": "Connections",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 17 },
+      "id": 12, "type": "timeseries", "title": "Requests per minute by instance",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 5 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
-        { "expr": "increase(ss_http_accept_total[1m])", "refId": "A", "legendFormat": "Accepted/min" },
-        { "expr": "increase(ss_http_close_total[1m])",  "refId": "B", "legendFormat": "Closed/min" },
-        { "expr": "ss_http_connections",                 "refId": "C", "legendFormat": "Active" }
+        { "expr": "rate(ss_http_request_total{job=~\"$job\",instance=~\"$instance\"}[1m]) * 60", "refId": "A", "legendFormat": "{{instance}} req/min" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops" } }
+    },
+
+    {
+      "id": 13, "type": "timeseries", "title": "Coroutines (active / peek)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 13 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "sum by (instance)(swoole_coroutines{job=~\"$job\",instance=~\"$instance\"})", "refId": "A", "legendFormat": "{{instance}} active" },
+        { "expr": "sum by (instance)(swoole_coroutines_peek{job=~\"$job\",instance=~\"$instance\"})", "refId": "B", "legendFormat": "{{instance}} peek" }
       ]
     },
     {
-      "id": 11, "type": "timeseries", "title": "Memory Usage per Worker",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 17 },
+      "id": 14, "type": "timeseries", "title": "Connections (accepted/closed per min, active)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 13 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
-        { "expr": "ss_http_memory_per_worker_bytes", "refId": "A", "legendFormat": "Per worker" },
-        { "expr": "proc_memory_bytes",               "refId": "B", "legendFormat": "Process RSS" }
-      ],
-      "fieldConfig": { "defaults": { "unit": "bytes" } }
+        { "expr": "sum(increase(ss_http_accept_total{job=~\"$job\",instance=~\"$instance\"}[1m]))", "refId": "A", "legendFormat": "accepted/min" },
+        { "expr": "sum(increase(ss_http_close_total{job=~\"$job\",instance=~\"$instance\"}[1m]))",  "refId": "B", "legendFormat": "closed/min" },
+        { "expr": "sum(ss_http_connections{job=~\"$job\",instance=~\"$instance\"})",                 "refId": "C", "legendFormat": "active total" }
+      ]
     },
 
-    { "type": "row", "title": "HTTP details", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 }, "collapsed": false, "id": 12 },
+    { "type": "row", "title": "Latency & Memory", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 21 }, "collapsed": false, "id": 20 },
 
     {
-      "id": 13, "type": "gauge", "title": "In‑flight requests",
-      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 26 },
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "ss_http_requests_inflight", "refId": "A" }]
-    },
-    {
-      "id": 14, "type": "stat", "title": "Queue size",
-      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 26 },
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "ss_http_requests_queue", "instant": true, "refId": "A" }]
-    },
-    {
-      "id": 15, "type": "timeseries", "title": "HTTP latency p95 (s)",
-      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 26 },
+      "id": 21, "type": "timeseries", "title": "HTTP latency p95 (cluster)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 22 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
-        { "expr": "histogram_quantile(0.95, sum(rate(ss_http_request_duration_seconds_bucket[5m])) by (le))", "refId": "A", "legendFormat": "p95" }
+        { "expr": "histogram_quantile(0.95, sum(rate(ss_http_request_duration_seconds_bucket{job=~\"$job\",instance=~\"$instance\"}[5m])) by (le))", "refId": "A", "legendFormat": "p95" }
       ],
       "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 22, "type": "timeseries", "title": "Memory (RSS and per worker)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 22 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "sum(proc_memory_bytes{job=~\"$job\",instance=~\"$instance\"})", "refId": "A", "legendFormat": "RSS total" },
+        { "expr": "sum(ss_http_memory_per_worker_bytes{job=~\"$job\",instance=~\"$instance\"})", "refId": "B", "legendFormat": "per worker (approx)" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes" } }
     }
   ],
-  "templating": { "list": [] }
+  "annotations": { "list": [] },
+  "links": [],
+  "timezone": ""
 }

@@ -16,6 +16,11 @@ final class ContainerFactory {
             public function has(string $id): bool {
                 return class_exists($id) || isset($this->entries[$id]);
             }
+
+            public function set(string $id, mixed $entry): void {
+                $this->entries[$id] = $entry;
+            }
+
             private function make(string $id) {
                 $r = new \ReflectionClass($id);
                 $ctor = $r->getConstructor();

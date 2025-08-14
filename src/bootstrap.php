@@ -2,7 +2,7 @@
 use Dotenv\Dotenv;
 
 $startTime = microtime(true);
-echo "Loading environment variables...\n";
+echo "Loading bootstrap...\n";
 
 function env(string $key, $default = null)
 {
@@ -46,4 +46,4 @@ function cacheDataFile()
     return $data;
 }
 
-echo "Environment variables loaded in " . (microtime(true) - $startTime) . " seconds.\n";
+echo "Bootstrap loaded in " . (microtime(true) - $startTime) . " seconds.\n";
