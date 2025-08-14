@@ -1,168 +1,69 @@
 {
     "__inputs": [
-        {
-            "name": "DS_PROMETHEUS",
-            "label": "Prometheus",
-            "description": "",
-            "type": "datasource",
-            "pluginId": "prometheus",
-            "pluginName": "Prometheus"
-        }
+        { "name": "DS_PROMETHEUS", "label": "Prometheus", "type": "datasource", "pluginId": "prometheus", "pluginName": "Prometheus" }
     ],
-    "__elements": [],
     "__requires": [
-        { "type": "panel", "id": "bargauge", "name": "Bar gauge", "version": "" },
         { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "9.0.0" },
         { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" },
         { "type": "panel", "id": "stat", "name": "Stat", "version": "" },
-        { "type": "panel", "id": "timeseries", "name": "Time series", "version": "" }
+        { "type": "panel", "id": "timeseries", "name": "Time series", "version": "" },
+        { "type": "panel", "id": "bargauge", "name": "Bar gauge", "version": "" }
     ],
-    "annotations": { "list": [] },
-    "description": "Swoole coroutine jobs dashboard (metrics from server.php).",
-    "editable": true,
-    "id": null,
+    "title": "Swoole Jobs (ss_*)",
+    "uid": "SS_JOBS_DASH",
+    "timezone": "",
+    "schemaVersion": 36,
+    "refresh": "5s",
+    "time": { "from": "now-30m", "to": "now" },
     "panels": [
         {
+            "id": 1, "type": "stat", "title": "Jobs OK (5m)",
             "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-            "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "mappings": [], "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } }, "overrides": [] },
             "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
-            "id": 1,
-            "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "center", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-            "targets": [
-                { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "expr": "sum(increase(ss_jobs_jobs_ok[5m]))", "instant": true, "legendFormat": "", "refId": "A" }
-            ],
-            "title": "Jobs OK (last 5m)",
-            "type": "stat"
+            "targets": [{ "expr": "sum(increase(ss_jobs_jobs_ok[5m]))", "instant": true, "refId": "A" }]
         },
         {
+            "id": 2, "type": "stat", "title": "Jobs ERR (5m)",
             "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-            "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "mappings": [], "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }] } }, "overrides": [] },
             "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
-            "id": 2,
-            "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "center", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-            "targets": [
-                { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "expr": "sum(increase(ss_jobs_jobs_err[5m]))", "instant": true, "legendFormat": "", "refId": "A" }
-            ],
-            "title": "Jobs ERR (last 5m)",
-            "type": "stat"
+            "targets": [{ "expr": "sum(increase(ss_jobs_jobs_err[5m]))", "instant": true, "refId": "A" }]
         },
         {
+            "id": 3, "type": "timeseries", "title": "Job p95 (s)",
             "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-            "fieldConfig": {
-                "defaults": {
-                    "color": { "mode": "palette-classic" },
-                    "custom": {
-                        "axisPlacement": "auto",
-                        "drawStyle": "line",
-                        "fillOpacity": 5,
-                        "lineInterpolation": "smooth",
-                        "lineWidth": 2,
-                        "pointSize": 4,
-                        "scaleDistribution": { "type": "linear" },
-                        "showPoints": "auto",
-                        "stacking": { "group": "A", "mode": "none" }
-                    },
-                    "mappings": [],
-                    "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 0.8 }] },
-                    "unit": "s"
-                },
-                "overrides": []
-            },
             "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
-            "id": 3,
-            "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single", "sort": "none" } },
-            "targets": [
-                { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "expr": "histogram_quantile(0.95, sum(rate(ss_jobs_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95", "refId": "A" }
-            ],
-            "title": "Job duration p95 (seconds)",
-            "type": "timeseries"
+            "targets": [{ "expr": "histogram_quantile(0.95, sum(rate(ss_jobs_duration_seconds_bucket[5m])) by (le))", "refId": "A", "legendFormat": "p95" }],
+            "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
         },
         {
+            "id": 4, "type": "timeseries", "title": "Throughput by module",
             "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-            "fieldConfig": {
-                "defaults": {
-                    "color": { "mode": "palette-classic" },
-                    "custom": {
-                        "axisPlacement": "auto",
-                        "drawStyle": "line",
-                        "fillOpacity": 5,
-                        "lineInterpolation": "smooth",
-                        "lineWidth": 2,
-                        "pointSize": 4,
-                        "scaleDistribution": { "type": "linear" },
-                        "showPoints": "auto",
-                        "stacking": { "group": "A", "mode": "none" }
-                    },
-                    "mappings": [],
-                    "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 0.8 }] },
-                    "unit": "ops"
-                },
-                "overrides": []
-            },
             "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
-            "id": 4,
-            "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single", "sort": "none" } },
             "targets": [
-                { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "expr": "sum(rate(ss_jobs_jobs_ok[1m])) by (module)", "legendFormat": "{{module}} OK/s", "refId": "A" },
-                { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "expr": "sum(rate(ss_jobs_jobs_err[1m])) by (module)", "legendFormat": "{{module}} ERR/s", "refId": "B" }
-            ],
-            "title": "Job throughput by module",
-            "type": "timeseries"
+                { "expr": "sum(rate(ss_jobs_jobs_ok[1m])) by (module)", "refId": "A", "legendFormat": "{{module}} OK/s" },
+                { "expr": "sum(rate(ss_jobs_jobs_err[1m])) by (module)", "refId": "B", "legendFormat": "{{module}} ERR/s" }
+            ]
         },
         {
+            "id": 5, "type": "bargauge", "title": "Workers (RR-style, approximated)",
             "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-            "fieldConfig": {
-                "defaults": { "color": { "mode": "thresholds" }, "mappings": [], "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] } },
-                "overrides": []
-            },
-            "gridPos": { "h": 7, "w": 12, "x": 0, "y": 12 },
-            "id": 5,
-            "options": {
-                "displayMode": "lcd",
-                "minVizHeight": 10,
-                "minVizWidth": 0,
-                "orientation": "horizontal",
-                "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-                "showUnfilled": true
-            },
+            "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
             "targets": [
-                { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "expr": "sum(ss_jobs_jobs_ok) by (module)", "instant": true, "legendFormat": "{{module}} OK", "refId": "A" }
-            ],
-            "title": "OK by module (total)",
-            "type": "bargauge"
+                { "expr": "ss_jobs_total_workers",   "refId": "A", "legendFormat": "total" },
+                { "expr": "ss_jobs_workers_ready",   "refId": "B", "legendFormat": "ready" },
+                { "expr": "ss_jobs_workers_working", "refId": "C", "legendFormat": "working" },
+                { "expr": "ss_jobs_workers_invalid", "refId": "D", "legendFormat": "invalid" }
+            ]
         },
         {
+            "id": 6, "type": "bargauge", "title": "Totals by module",
             "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-            "fieldConfig": {
-                "defaults": { "color": { "mode": "thresholds" }, "mappings": [], "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }] } },
-                "overrides": []
-            },
-            "gridPos": { "h": 7, "w": 12, "x": 12, "y": 12 },
-            "id": 6,
-            "options": {
-                "displayMode": "lcd",
-                "minVizHeight": 10,
-                "minVizWidth": 0,
-                "orientation": "horizontal",
-                "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-                "showUnfilled": true
-            },
+            "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
             "targets": [
-                { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }, "expr": "sum(ss_jobs_jobs_err) by (module)", "instant": true, "legendFormat": "{{module}} ERR", "refId": "A" }
-            ],
-            "title": "ERR by module (total)",
-            "type": "bargauge"
+                { "expr": "sum(ss_jobs_jobs_ok) by (module)",  "refId": "A", "legendFormat": "{{module}} OK" },
+                { "expr": "sum(ss_jobs_jobs_err) by (module)", "refId": "B", "legendFormat": "{{module}} ERR" }
+            ]
         }
     ],
-    "refresh": "5s",
-    "schemaVersion": 36,
-    "style": "dark",
-    "tags": ["swoole", "jobs", "prometheus"],
-    "templating": { "list": [] },
-    "time": { "from": "now-30m", "to": "now" },
-    "timezone": "",
-    "title": "Swoole Jobs dashboard",
-    "uid": "SS_JOBS_DASH",
-    "version": 1,
-    "weekStart": "monday"
+    "templating": { "list": [] }
 }
