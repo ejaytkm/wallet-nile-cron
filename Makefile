@@ -2,9 +2,6 @@
 start:
 	@cd environment && docker-compose up -d
 
-start-boot:
-	@cd environment && docker-compose run --rm app composer install
-
 build:
 	@cd environment && docker-compose up --build -d
 
@@ -18,8 +15,8 @@ app@install:
 
 # DEV
 app@restart:
-	@make docker@app
-	@printf 'Application restarted successfully.'
+	@docker restart app
+	@docker logs -f app
 
 app@autoload:
 	@docker exec -it -e XDEBUG_MODE=off app /usr/local/bin/composer dump-autoload
@@ -35,17 +32,11 @@ app@swole-version:
 ## DOCKER
 docker@tail-logs:
 	@docker logs -f app
-	@printf "Docker app logs are being followed..."
 
-docker@restart-app:
+docker@restart:
 	@docker restart app
-	@docker exec -it -e XDEBUG_MODE=off app /usr/local/bin/composer dump-autoload
-	@printf "Docker app environment successfully restarted.\n"
+	@printf "Docker wallet-nile environment successfully restarted.\n"
 
-docker@restart-workers:
-	 @docker restart app
-	@docker exec -it -e XDEBUG_MODE=off wallet-nile-app /usr/local/bin/composer dump-autoload
-	@printf "Docker worker environment successfully restarted.\n"
 
 ## COMMANDS
 app@cron-sync-bet:

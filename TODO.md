@@ -7,6 +7,15 @@
 - Graceful shutdown/restarts
 - Monitoring 
 
+14 August
+# Gate http queue store mechanism
+# Cronjob mechanism
+# BatchProcessing?
+
+15 August monitoring the new server
+# 
+
+
 # JOB MECHANISM
 - store -> run immediately -> if fail, move status to IN_QUEUE
 - cronjob to run
@@ -17,18 +26,14 @@
 # Workflow Current
 => fire by merchant that are active - get merchant by active status  
     =>get all the merchants active sites 
-        => 
-# Workflow Proposal 
-=> fire by merchant that are active - get merchant by active status  
-    => check database to order merchant priority
-        => get all the merchants => active betting providers 
-            =>
-
+        OLD => save as DB for node js server to do polling one by one
+        NEW => instead of fire one by one, we fire to gates to store all jobs. then fire as coroutines instead
 
 # Key considerations
 - memory usage when coroutines are being overused
 - throttling workers - there's a way to do it safely => can we use redis? 
 
-# Required
-~ max 100,000 workers
-dispatcher -> workers = will have low 
+# Requirements
+=> throttling workers of 2000 RPS
+=> when workers are in queue, how to handle the queue 
+=> throttling 200 RPS, don't go over than that. 

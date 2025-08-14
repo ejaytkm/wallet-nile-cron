@@ -22,23 +22,43 @@ $globalRps = env('GLOBAL_RPS') !== null ? (float) env('GLOBAL_RPS') : null;
 
 $server = new Server($host, $port, SWOOLE_BASE);
 $server->set([
-    Constant::OPTION_MAX_COROUTINE       => $maxCo,
-    Constant::OPTION_WORKER_NUM          => max(1, (int) env('WORKER_NUM', swoole_cpu_num() * 2)),
-    Constant::OPTION_TASK_WORKER_NUM     => (int) env('TASK_WORKER_NUM', 0),
-    Constant::OPTION_LOG_LEVEL           => SWOOLE_LOG_INFO,
-    Constant::OPTION_ENABLE_COROUTINE    => true,
-    Constant::OPTION_OPEN_HTTP2_PROTOCOL => true,
-    Constant::OPTION_BUFFER_OUTPUT_SIZE  => 64 * 1024 * 1024,
-    Constant::OPTION_SOCKET_BUFFER_SIZE  => 8 * 1024 * 1024,
+    'max_coroutine'       => $maxCo,
+    'worker_num'          => max(1, (int) env('WORKER_NUM', swoole_cpu_num() * 2)),
+    'task_worker_num'     => (int) env('TASK_WORKER_NUM', 0),
+    'log_level'           => SWOOLE_LOG_INFO,
+    'enable_coroutine'    => true,
+    'open_http2_protocol' => true,
+    'buffer_output_size'  => 64 * 1024 * 1024,
+    'socket_buffer_size'  => 8 * 1024 * 1024,
 ]);
 
-$server->on('Request', function ($req, $res) use ($maxConc, $globalRps) {
+$server->on('Request', function ($req, $res) use ($maxConc, $globalRps) : void {
     $uri    = $req->server['request_uri']    ?? '/';
     $method = $req->server['request_method'] ?? 'GET';
 
     if ($uri === '/health') {
         $res->header('Content-Type', 'application/json');
+        sleep(60);
         $res->end(json_encode(['ok' => true, 'time' => time()]));
+        return;
+    }
+
+    if ($uri === '/test') {
+        $payload = json_decode($req->rawContent() ?: '[]', true) ?: [];
+        $id = isset($payload['id']) ? (int)$payload['id'] : 'unknown';
+
+        echo "Running #id " . $id . " - " . date('Y-m-d H:i:s') . "\n";
+        $delay = 5;
+        sleep($delay); // Simulate some processing delay
+        $res->header('Content-Type', 'application/json');
+        $res->end(json_encode([
+            'message' => 'Test endpoint - received payload',
+            'status'  => 'OK',
+            'delay'   => $delay,
+            '$_POST'    => $payload
+        ]));
+
+        echo "Completed #id " . $id . " - " . date('Y-m-d H:i:s') . "\n";
         return;
     }
 
