@@ -19,7 +19,7 @@
   },
   "scripts": {
     "post-install-cmd": [
-      "echo 'Run: php server.php to start a worker instance'",
+      "echo 'Run: php ../../../Library/Application Support/JetBrains/PhpStorm2024.3/scratches/server.php to start a worker instance'",
       "echo 'Run: php exec/syncbethistory.php run to start the dispatcher'"
     ]
   }
