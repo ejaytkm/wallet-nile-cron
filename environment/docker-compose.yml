@@ -18,7 +18,7 @@ services:
     command: sh startup.sh
     ports:
       - "9501:9501" # Swoole default port
-      - "9502:2112" # Metrics port
+      - "2112:2112" # Metrics port
 
 networks:
   evalink:

@@ -6,7 +6,7 @@ echo "Loading environment variables...\n";
 
 function env(string $key, $default = null)
 {
-    return $_ENV[$key] ?? getenv($key) ?? $default;
+    return $_ENV[$key] ?? $default;
 }
 
 $dotenv = Dotenv::createImmutable(__DIR__ . '/../');

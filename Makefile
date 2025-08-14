@@ -16,7 +16,7 @@ app@install:
 # DEV
 app@restart:
 	@docker restart wallet-nile-cron
-	@docker logs -f wallet-nile-cron
+	@docker logs -f wallet-nile-cron --tail 10
 
 app@autoload:
 	@docker exec -it -e XDEBUG_MODE=off app /usr/local/bin/composer dump-autoload
@@ -34,7 +34,7 @@ docker@tail-logs:
 	@docker logs -f app
 
 docker@restart:
-	@docker restart app
+	@docker restart wallet-nile-cron
 	@printf "Docker wallet-nile environment successfully restarted.\n"
 
 

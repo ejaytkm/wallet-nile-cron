@@ -7,6 +7,9 @@
 - Monitoring
 - Graceful shutdown/restarts `IS A MUST`
 
+# IMPORTANT
+- PDO connection should be closed after each job is done
+
 14 August
 # Gate http queue store mechanism
 # Cronjob mechanism
