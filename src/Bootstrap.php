@@ -1,6 +1,9 @@
 <?php
 use Dotenv\Dotenv;
 
+$startTime = microtime(true);
+echo "Loading environment variables...\n";
+
 function env(string $key, $default = null)
 {
     return $_ENV[$key] ?? getenv($key) ?? $default;
@@ -14,7 +17,6 @@ if (!defined('SWOOLE_HOOK_ALL')) define('SWOOLE_HOOK_ALL', 0xFFFFFF);
 if (!defined('SWOOLE_HOOK_NATIVE_CURL')) define('SWOOLE_HOOK_NATIVE_CURL', 0x2000);
 
 // singletons containers
-
 
 function cacheDataFile()
 {
@@ -43,3 +45,5 @@ function cacheDataFile()
 
     return $data;
 }
+
+echo "Environment variables loaded in " . (microtime(true) - $startTime) . " seconds.\n";

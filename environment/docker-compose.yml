@@ -1,7 +1,7 @@
 name: wallet-nile-cron
 services:
-  app:
-    container_name: app
+  wallet-nile-cron:
+    container_name: wallet-nile-cron
     build:
       context: ./php
       dockerfile: Dockerfile
@@ -18,7 +18,11 @@ services:
     command: sh startup.sh
     ports:
       - "9501:9501" # Swoole default port
+      - "9502:2112" # Metrics port
 
 networks:
   evalink:
+    name: evalink
+    driver: bridge
+  shared-network:
     external: true

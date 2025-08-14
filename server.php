@@ -4,185 +4,141 @@ declare(strict_types=1);
 require __DIR__ . '/vendor/autoload.php';
 require __DIR__ . '/src/Bootstrap.php';
 
-use App\Utils\GuzzleUtil;
-use Swoole\Runtime;
 use Swoole\Http\Server;
-use Swoole\Constant;
-use App\Utils\RateLimiter;
-use App\Utils\Semaphore;
+use Swoole\Coroutine;
+use Prometheus\CollectorRegistry;
+use Prometheus\RenderTextFormat;
+use Prometheus\Storage\APC;
+use Prometheus\Storage\InMemory;
 
-Runtime::enableCoroutine(SWOOLE_HOOK_ALL ^ SWOOLE_HOOK_NATIVE_CURL);
+$storage = extension_loaded('apcu') && ini_get('apc.enabled') ? new APC() : new InMemory();
+$reg = new CollectorRegistry($storage);
 
-// Env via global env() from Bootstrap
-$host      = env('SERVER_HOST', '0.0.0.0');
-$port      = (int) env('SERVER_PORT', 9501);
-$maxCo     = (int) env('MAX_COROUTINES', 100000);
-$maxConc   = (int) env('MAX_CONCURRENCY', 2000);
-$globalRps = env('GLOBAL_RPS') !== null ? (float) env('GLOBAL_RPS') : null;
+$httpReqs = $reg->getOrRegisterCounter('ss_http', 'request_total', 'HTTP requests', ['method', 'code']);
+$httpInFlight = $reg->getOrRegisterGauge('ss_http', 'requests_inflight', 'In-flight HTTP requests');
+$httpLatency = $reg->getOrRegisterHistogram('ss_http', 'request_duration_seconds', 'HTTP request duration', [
+    'method', 'code'
+], [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10]);
+$httpUptime = $reg->getOrRegisterGauge('ss_http', 'uptime_seconds', 'Server uptime seconds');
 
-$server = new Server($host, $port, SWOOLE_BASE);
-$server->set([
-    'max_coroutine'       => $maxCo,
-    'worker_num'          => max(1, (int) env('WORKER_NUM', swoole_cpu_num() * 2)),
-    'task_worker_num'     => (int) env('TASK_WORKER_NUM', 0),
-    'log_level'           => SWOOLE_LOG_INFO,
-    'enable_coroutine'    => true,
-    'open_http2_protocol' => true,
-    'buffer_output_size'  => 64 * 1024 * 1024,
-    'socket_buffer_size'  => 8 * 1024 * 1024,
+$jobsOk = $reg->getOrRegisterCounter('ss_jobs', 'jobs_ok', 'Jobs OK', ['module', 'site']);
+$jobsErr = $reg->getOrRegisterCounter('ss_jobs', 'jobs_err', 'Jobs errors', ['module', 'site']);
+$jobsDur = $reg->getOrRegisterHistogram('ss_jobs', 'duration_seconds', 'Job duration', ['module', 'site'], [
+    0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 30
 ]);
+$crGauge = $reg->getOrRegisterGauge('swoole', 'coroutines', 'Active coroutines');
+$memGauge = $reg->getOrRegisterGauge('proc', 'memory_bytes', 'Process RSS bytes');
 
-$server->on('Request', function ($req, $res) use ($maxConc, $globalRps) : void {
-    $uri    = $req->server['request_uri']    ?? '/';
-    $method = $req->server['request_method'] ?? 'GET';
+$start = microtime(true);
+$host = env('SERVER_HOST', '0.0.0.0');
+$port = (int)env('SERVER_PORT', '9501');
+$timeoutDefault = (float)env('TARGET_TIMEOUT', 20);
 
-    if ($uri === '/health') {
-        $res->header('Content-Type', 'application/json');
-        sleep(60);
-        $res->end(json_encode(['ok' => true, 'time' => time()]));
+$server = new Server($host, $port);
+$metricsHost = env('SERVER_HOST', '127.0.0.1');
+$metricsPort = 2112; // hardcoded as requested
+$server->addlistener($metricsHost, $metricsPort, SWOOLE_SOCK_TCP);
+
+// Add $metricsPort to the use() list
+$server->on('request', function (Swoole\Http\Request $req, Swoole\Http\Response $res) use (
+    $reg, $httpReqs, $httpInFlight, $httpLatency, $httpUptime, $jobsOk, $jobsErr, $jobsDur, $crGauge, $memGauge, $start, $timeoutDefault, $metricsPort
+) {
+    $method = strtoupper($req->server['request_method'] ?? 'GET');
+    $path = $req->server['request_uri'] ?? '/';
+
+    // Serve /metrics only on metrics port 2112
+    $dstPort = (int)($req->server['server_port'] ?? 0);
+    if ($dstPort === $metricsPort) {
+        if ($path !== '/metrics') { $res->status(404); $res->end(); return; }
+        $renderer = new RenderTextFormat();
+        $res->header('Content-Type', RenderTextFormat::MIME_TYPE);
+        $res->end($renderer->render($reg->getMetricFamilySamples()));
         return;
     }
 
-    if ($uri === '/test') {
-        $payload = json_decode($req->rawContent() ?: '[]', true) ?: [];
-        $id = isset($payload['id']) ? (int)$payload['id'] : 'unknown';
+    $httpUptime->set((int)(microtime(true) - $start));
+    $crGauge->set(Coroutine::stats()['coroutine_num'] ?? 0);
+    if (function_exists('memory_get_usage')) $memGauge->set(memory_get_usage(true));
 
-        echo "Running #id " . $id . " - " . date('Y-m-d H:i:s') . "\n";
-        $delay = 5;
-        sleep($delay); // Simulate some processing delay
-        $res->header('Content-Type', 'application/json');
-        $res->end(json_encode([
-            'message' => 'Test endpoint - received payload',
-            'status'  => 'OK',
-            'delay'   => $delay,
-            '$_POST'    => $payload
-        ]));
-
-        echo "Completed #id " . $id . " - " . date('Y-m-d H:i:s') . "\n";
+    if ($path === '/metrics' && $dstPort == $metricsPort) {
+        $renderer = new RenderTextFormat();
+        $res->header('Content-Type', RenderTextFormat::MIME_TYPE);
+        $res->end($renderer->render($reg->getMetricFamilySamples()));
         return;
     }
 
-    // Accept site/module/mids payload; keep /batch alias for convenience
-    if ($uri === '/batch/sync_bet' && $method === 'POST') {
-        $payload = json_decode($req->rawContent() ?: '[]', true) ?: [];
+    if ($path === '/health') {
+        $res->header('Content-Type', 'text/plain');
+        $res->end("ok\n");
+        return;
+    }
 
-        $site    = isset($payload['site'])   ? (string)$payload['site']   : '';
-        $module  = isset($payload['module']) ? (string)$payload['module'] : '';
-        $mids    = isset($payload['mids']) && is_array($payload['mids']) ? $payload['mids'] : [];
+    $t0 = microtime(true);
+    $httpInFlight->inc();
 
-        // Validate
-        if ($site === '' || $module === '' || empty($mids)) {
-            $res->status(400);
-            $res->header('Content-Type', 'application/json');
-            $res->end(json_encode([
-                'error' => 'Invalid payload: require "site" (string), "module" (string), and "mids" (array).'
-            ]));
-            return;
-        }
+    try {
+        if ($path === '/batch/syncbet' && $method === 'POST') {
+            $raw = $req->rawContent() ?: '';
+            $payload = $raw !== '' ? json_decode($raw, true) : [];
+            $site = (string)($payload['site'] ?? '');
+            $module = (string)($payload['module'] ?? '');
+            $mids = (array)($payload['mids'] ?? []);
 
-        // Wallet endpoint & creds from env
-        $walletUrl   = env('WALLET_URL') . '/api/v1/index.php';
-        $accessId    = env('SYSTEM_ADMIN_ACCESS_ID', '');
-        $accessToken = env('SYSTEM_ADMIN_TOKEN', '');
-        $cronJobId   = isset($payload['cronJobId']) ? (int)$payload['cronJobId'] : null;
+            $timeout = (float)($payload['timeout'] ?? $timeoutDefault);
+            $retry = (int)($payload['retry'] ?? 1);
 
-        if ($accessId === '' || $accessToken === '') {
-            $res->status(500);
-            $res->header('Content-Type', 'application/json');
-            $res->end(json_encode([
-                'error' => 'SERVER_MISCONFIGURED',
-                'message' => 'Missing SYSTEM_ADMIN_ACCESS_ID or SYSTEM_ADMIN_TOKEN in env.'
-            ]));
-            return;
-        }
+            if ($site === '' || $module === '' || !$mids) {
+                $res->status(400);
+                $res->header('Content-Type', 'application/json');
+                $res->end(json_encode(['status' => 'error', 'error' => 'invalid payload']));
+                $httpReqs->inc([$method, '400']);
+                $httpLatency->observe(microtime(true) - $t0, [$method, '400']);
+                return;
+            }
 
-        // Throttling
-        $sem            = new Semaphore($maxConc);
-        $globalLimiter  = $globalRps ? new RateLimiter($globalRps, 100) : null;
-        $perHostLimiter = [];
-        $hostName       = parse_url($walletUrl, PHP_URL_HOST) ?: '';
-        $perHostRpsEnv  = env('PER_HOST_RPS'); // optional
-        if ($hostName !== '' && $perHostRpsEnv !== null && $perHostRpsEnv !== '') {
-            $perHostLimiter[$hostName] = new RateLimiter((float)$perHostRpsEnv, 100);
-        }
+            $wg = new Coroutine\WaitGroup();
 
-        // Guzzle helper
-        $http = new GuzzleUtil();
-
-        // @TODO: Implement some database - get all jobs tied to $mid and $module
-        // @TODO: Throttling - use Semaphore and RateLimiter to limit concurrency and RPS
-
-        $wg      = new Swoole\Coroutine\WaitGroup();
-        $results = [];
-        $summary  = [
-            'total' => count($mids),
-            'wait' => false
-        ];
-
-        // @TODO: Get cron jobs and store into memory
-        foreach ($mids as $mid) {
-            $job = [
-                'url'  => $walletUrl,
-                'data' => array_filter([
-                    'module'         => '/betHistory/' . $module, // e.g. /betHistory/jili
-                    'accessId'       => $accessId,
-                    'accessToken'    => $accessToken,
-                    'nonTransaction' => 1,
-                    'site'           => $site,
-                    'cronJobId'      => $cronJobId,
-                ], static fn($v) => $v !== null),
-            ];
-
-            $wg->add();
-            go(function () use ($mid, $job, $retry, $sem, $globalLimiter, $perHostLimiter, $hostName, $http, &$results, $wg) {
-                $sem->acquire();
-                try {
-                    if ($globalLimiter) $globalLimiter->take();
-                    if ($hostName && isset($perHostLimiter[$hostName])) $perHostLimiter[$hostName]->take();
-
-                    $attempt = 0; $resp = null;
-                    while ($attempt <= $retry) {
-                        $attempt++;
-                        $resp = $http->execute('POST',
-                            $job['url'],
-                            ['Content-Type' => 'application/x-www-form-urlencoded'],
-                            $job['data']
-                        );
-
-                        if (!isset($resp['error']) && ($resp['status'] >= 200 && $resp['status'] < 500)) {
-                            break;
-                        }
-
-                        Swoole\Coroutine::sleep(
-                            min(1.0 * $attempt, 5.0) * (0.5 + mt_rand() / mt_getrandmax())
-                        );
-
-                        // @TODO: Fire HTTP back to worker server to MARK as success
+            foreach ($mids as $mid) {
+                $wg->add();
+                Coroutine::create(function () use ($wg, $module, $site, $mid, $jobsOk, $jobsErr, $jobsDur) {
+                    $t1 = microtime(true);
+                    try {
+                        Coroutine::sleep(0.005); // simulate
+                        $jobsOk->inc([$module, (string)$site]);
+                    } catch (\Throwable) {
+                        $jobsErr->inc([$module, (string)$site]);
+                    } finally {
+                        $jobsDur->observe(microtime(true) - $t1, [$module, (string)$site]);
+                        $wg->done();
                     }
+                });
+            }
 
-                    $results[$mid] = $resp;
-                } finally {
-                    $sem->release();
-                    $wg->done();
-                }
-            });
+            $wg->wait();
+
+            $res->header('Content-Type', 'application/json');
+            $res->end(json_encode(['status' => 'ok', 'site' => $site, 'module' => $module, 'count' => count($mids)]));
+
+            $httpReqs->inc([$method, '200']);
+            $httpLatency->observe(microtime(true) - $t0, [$method, '200']);
+            return;
         }
 
-        // do not wait $wg->wait();
-        ksort($results);
-        $ok = 0; $errc = 0;
-        foreach ($results as $r) isset($r['error']) || ($r['status'] ?? 0) >= 400 ? $errc++ : $ok++;
+        $res->status(404);
         $res->header('Content-Type', 'application/json');
-        $res->end(json_encode([
-            'ok' => $ok,
-            'err' => $errc,
-            'results' => $results ?: $summary
-        ], JSON_UNESCAPED_SLASHES));
-        return;
+        $res->end(json_encode(['status' => 'error', 'error' => 'not found']));
+        $httpReqs->inc([$method, '404']);
+        $httpLatency->observe(microtime(true) - $t0, [$method, '404']);
+    } catch (\Throwable) {
+        $res->status(500);
+        $res->header('Content-Type', 'application/json');
+        $res->end(json_encode(['status' => 'error', 'error' => 'internal']));
+        $httpReqs->inc([$method, '500']);
+        $httpLatency->observe(microtime(true) - $t0, [$method, '500']);
+    } finally {
+        $httpInFlight->dec();
     }
-
-    $res->status(404);
-    $res->end('Not found');
 });
-echo "Swoole HTTP server started at http://{$host}:{$port}\n";
+
+echo "Swoole listening on {$host}:{$port}\n";
 $server->start();

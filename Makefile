@@ -9,20 +9,20 @@ down:
 	@cd environment && docker-compose down
 
 app@install:
-	@docker start app exec -it -e XDEBUG_MODE=off app /usr/local/bin/composer install
+	@docker start app exec -it -e XDEBUG_MODE=off wallet-nile-cron /usr/local/bin/composer install
 	@make app@restart
 	@printf "\nApplication dependencies installed successfully.\n"
 
 # DEV
 app@restart:
-	@docker restart app
-	@docker logs -f app
+	@docker restart wallet-nile-cron
+	@docker logs -f wallet-nile-cron
 
 app@autoload:
 	@docker exec -it -e XDEBUG_MODE=off app /usr/local/bin/composer dump-autoload
 
 app@clean-cache:
-	@docker exec -it -e XDEBUG_MODE=off app php cache.php
+	@docker exec -it -e XDEBUG_MODE=off wallet-nile-cron php cache.php
 	@printf "Cache cleaned successfully.\n"
 
 app@swole-version:

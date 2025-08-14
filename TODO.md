@@ -4,8 +4,8 @@
 - cron job to run http_job_queue then run syncbethistory
 - Prevent job -> cronjob
 - Prevent batch job re-runs
-- Graceful shutdown/restarts
-- Monitoring 
+- Monitoring
+- Graceful shutdown/restarts `IS A MUST`
 
 14 August
 # Gate http queue store mechanism
@@ -13,7 +13,6 @@
 # BatchProcessing?
 
 15 August monitoring the new server
-# 
 
 
 # JOB MECHANISM
