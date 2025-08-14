@@ -37,7 +37,6 @@ docker@restart:
 	@docker restart wallet-nile-cron
 	@printf "Docker wallet-nile environment successfully restarted.\n"
 
-
 ## COMMANDS
-app@sync_bet_history:
-	@docker exec -it wallet-nile-cron php crond/sync_bet_history.php
+app@cron:
+	@docker exec -it wallet-nile-cron php cron.php
