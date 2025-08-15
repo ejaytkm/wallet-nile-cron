@@ -1,17 +1,19 @@
 <?php
 declare(strict_types=1);
 
-namespace App\Http;
+namespace App;
 
 use App\Config\ServerConfig;
+use App\Http\Runtime\Shutdown;
 use App\Metrics\StatsSampler;
 use Prometheus\CollectorRegistry;
 use Prometheus\RenderTextFormat;
 use Swoole\Coroutine;
 use Swoole\Coroutine\WaitGroup;
 use Swoole\Http\Server;
+use Swoole\Timer;
 
-final class HttpServer
+final class BaseServer
 {
     private Server $server;
 
@@ -20,6 +22,7 @@ final class HttpServer
         private CollectorRegistry $registry,
         private array $m
     ) {
+        $debug = env('APP_DEBUG', false);
         $this->server = new Server(
             $config->host,
             $config->port
@@ -34,6 +37,11 @@ final class HttpServer
             'buffer_output_size'  => 64 * 1024 * 1024,
             'socket_buffer_size'  => 8 * 1024 * 1024,
             'log_level'           => SWOOLE_LOG_INFO,
+
+            // DEBUG
+            'reload_async'        => $debug ?: null,
+            'max_wait_time'       => $debug ? 10 : null,
+            'max_request'         => $debug ? null : 10000,
         ]);
 
         // metric listener + callback
@@ -89,12 +97,88 @@ final class HttpServer
             }
         });
 
+        // Graceful restarts
+        $this->server->on('WorkerStart', function ($server, int $workerId) {
+            echo "Worker #{$workerId} started.\n";
+        });
+
+        $this->server->on('Shutdown', function ($server) {
+            echo "Swoole server is shutting down.\n";
+            Shutdown::markStopping();
+        });
+
+        $this->server->on('WorkerStop', function ($server, int $workerId) {
+            echo "Worker #{$workerId} stopped.\n";
+            Shutdown::markStopping();
+
+        });
+
+        $this->server->on('WorkerExit', function ($server, int $workerId) {
+            echo "Worker #{$workerId} exited.\n";
+            Shutdown::markStopping();
+
+        });
+
         echo "Swoole listening on {$this->config->host}:{$this->config->port}, metrics on {$this->config->metricsHost}:{$this->config->metricsPort}\n";
+
+        $this->startHotReloadIfDebug();
         $this->server->start();
     }
 
     public function getServer(): Server
     {
         return $this->server;
+    }
+
+    private function startHotReloadIfDebug(): void
+    {
+        $debug = filter_var((string) env('APP_DEBUG', '0'), FILTER_VALIDATE_BOOL);
+        if (!$debug) return;
+
+        $dirs = array_filter(array_map('trim', explode(',', (string) env('WATCH_DIRS', 'src,public'))));
+        $exts = array_filter(array_map('trim', explode(',', (string) env('WATCH_EXT', 'php,ini'))));
+        $intervalMs = (int) env('WATCH_INTERVAL_MS', 5000);
+
+        $last = '';
+        Timer::tick($intervalMs, function () use (&$last, $dirs, $exts) {
+            $hash = $this->hashDirs($dirs, $exts);
+            if ($hash !== $last) {
+                echo "\n[Hot Reload] Changes detected, reloading workers...\n";
+
+                $last = $hash;
+                // Hot reload all workers (graceful because reload_async + max_wait_time)
+                $this->server->reload();
+            }
+        });
+    }
+
+    /** Compute a cheap hash of mtimes for selected extensions; ignore heavy dirs. */
+    private function hashDirs(array $dirs, array $exts): string
+    {
+        $sum = 0;
+        $extMap = array_flip(array_map('strtolower', $exts));
+        $ignore = ['vendor', 'storage', '.git', '.idea', 'node_modules'];
+
+        foreach ($dirs as $root) {
+            if (!is_dir($root)) continue;
+            $it = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS)
+            );
+            foreach ($it as $file) {
+                /** @var \SplFileInfo $file */
+                $path = $file->getPathname();
+                // skip ignored directories fast
+                foreach ($ignore as $bad) {
+                    if (str_contains($path, DIRECTORY_SEPARATOR . $bad . DIRECTORY_SEPARATOR)) {
+                        continue 2;
+                    }
+                }
+                $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+                if ($ext === '' || !isset($extMap[$ext])) continue;
+
+                $sum += ($file->getMTime() % 0x7fffffff);
+            }
+        }
+        return (string) $sum;
     }
 }

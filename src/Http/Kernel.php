@@ -4,7 +4,9 @@ declare(strict_types=1);
 namespace App\Http;
 
 use FastRoute\Dispatcher;
+use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
+use Psr\Container\NotFoundExceptionInterface;
 use Swoole\Http\Request;
 use Swoole\Http\Response;
 
@@ -42,6 +44,11 @@ final class Kernel
         }
 
         [$class, $action] = $route[1];
+
+        /**
+         * @throws ContainerExceptionInterface
+         * @throws NotFoundExceptionInterface
+         */
         $core = function () use ($class, $action, $req, $res, $c) {
             $ctrl = $c->get($class);
             return $ctrl->$action($req, $res);

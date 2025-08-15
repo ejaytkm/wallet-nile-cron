@@ -4,8 +4,8 @@ declare(strict_types=1);
 require __DIR__ . '/vendor/autoload.php';
 require __DIR__ . '/src/bootstrap.php';
 
+use App\BaseServer;
 use App\Config\ServerConfig;
-use App\Http\HttpServer;
 use App\Http\Kernel;
 use App\Http\Router;
 use App\Metrics\RegistryFactory;
@@ -17,7 +17,7 @@ $cfg = ServerConfig::fromEnv();
 $router    = new Router();
 $kernel    = new Kernel($router);
 
-$http = new HttpServer($cfg, $registry, $metrics);
+$http = new BaseServer($cfg, $registry, $metrics);
 
 Global $container;
 $container->set(Server::class, $http->getServer());

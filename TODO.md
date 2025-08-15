@@ -2,28 +2,27 @@
 - Simple job processing for gates => create job -> if fail we mark as fail
 - Fire to server => IGNORE if cronjob is already running based on site/merchant_id
 - cron job to run http_job_queue then run syncbethistory
-- Prevent job -> cronjob
+- Prevent gate jobs from running if MID/MERCHANT_ID already running
 - Prevent batch job re-runs
 - Graceful shutdown/restarts `IS A MUST`
+- Add redis/database to store whole fleet process count
+- Write the cronjob as one application???????
+- Per process, use that one PDO connection for REPOSITORIES
 
-# IMPORTANT
-- PDO connection should be closed after each job is done
-- Testing 
-
-14 August
-# Gate http queue store mechanism
-# Cronjob mechanism
-# BatchProcessing?
-
-15 August monitoring the new server
-
-
+# 15 August -monitoring the new server
+- Gate http queue store mechanism
+- Cronjob mechanism
+- BatchProcessing?
 # JOB MECHANISM
 - store -> run immediately -> if fail, move status to IN_QUEUE
 - cronjob to run
 
 # YK
-- Reduce the 6hours interval to maybe 2hours instead. 
+- Reduce the 6hours interval to maybe 2hours instead.
+
+# 16 August - Deployment and Stress Testing 
+- Stress testing the application till it breaks completely
+- mysql 
 
 # Workflow Current
 => fire by merchant that are active - get merchant by active status  

@@ -13,7 +13,9 @@ final class Router {
             $r->addRoute('GET',  '/stats',  [Controllers\HealthController::class, 'stats']);
 
             $r->addRoute('GET', '/test', [Controllers\TestController::class, 'index']);
-            $r->addRoute('POST', '/batch/syncbet', [Controllers\JobsController::class, 'syncBet']);
+
+            // Queue Routes
+            $r->addRoute('POST', '/queue/syncbet', [Controllers\QueueController::class, 'syncBet']);
         });
     }
     public function dispatch(string $method, string $uri): array {

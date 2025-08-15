@@ -14,7 +14,50 @@ final class PDOAbstract
         $this->pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
     }
 
-    // ---------- Core ----------
+    public function getPdo(): PDO
+    {
+        return $this->pdo;
+    }
+
+    public function query(string $sql, array $params = [], int $fetchMode = PDO::FETCH_ASSOC): array
+    {
+        $stmt = $this->run($sql, $params);
+        return $stmt->fetchAll($fetchMode);
+    }
+
+    public function execute(string $sql, array $params = []): bool
+    {
+        $stmt = $this->run($sql, $params);
+        return $stmt->rowCount() > 0;
+    }
+
+    public function insert(string $sql, array $params = []): int
+    {
+        $this->run($sql, $params);
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    public function run(string $sql, array $params = []): PDOStatement
+    {
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        return $stmt;
+    }
+
+    public function begin(): bool
+    {
+        return $this->pdo->beginTransaction();
+    }
+
+    public function commit(): bool
+    {
+        return $this->pdo->commit();
+    }
+
+    public function rollback(): bool
+    {
+        return $this->pdo->rollBack();
+    }
 
     public function select(string $sql, array $params = [], int $fetch = PDO::FETCH_ASSOC): array
     {
@@ -25,95 +68,6 @@ final class PDOAbstract
         return $st->fetchAll($fetch);
     }
 
-    public function selectOne(string $sql, array $params = [], int $fetch = PDO::FETCH_ASSOC): mixed
-    {
-        [$sql2, $bind] = $this->prepareBindings($sql, $params);
-        $st = $this->pdo->prepare($sql2);
-        $this->bindAll($st, $bind);
-        $st->execute();
-        return $st->fetch($fetch) ?: null;
-    }
-
-    public function scalar(string $sql, array $params = []): mixed
-    {
-        [$sql2, $bind] = $this->prepareBindings($sql, $params);
-        $st = $this->pdo->prepare($sql2);
-        $this->bindAll($st, $bind);
-        $st->execute();
-        $v = $st->fetchColumn();
-        return $v === false ? null : $v;
-    }
-
-    public function exec(string $sql, array $params = []): int
-    {
-        [$sql2, $bind] = $this->prepareBindings($sql, $params);
-        $st = $this->pdo->prepare($sql2);
-        $this->bindAll($st, $bind);
-        $st->execute();
-        return $st->rowCount();
-    }
-
-    public function insertId(): string
-    {
-        return $this->pdo->lastInsertId();
-    }
-
-    // ---------- Convenience fetchers ----------
-
-    public function selectAssoc(string $sql, array $params = []): array
-    {
-        return $this->select($sql, $params, PDO::FETCH_ASSOC);
-    }
-
-    public function selectNum(string $sql, array $params = []): array
-    {
-        return $this->select($sql, $params, PDO::FETCH_NUM);
-    }
-
-    public function selectBoth(string $sql, array $params = []): array
-    {
-        return $this->select($sql, $params, PDO::FETCH_BOTH);
-    }
-
-    public function selectObj(string $sql, array $params = []): array
-    {
-        return $this->select($sql, $params, PDO::FETCH_OBJ);
-    }
-
-    /** FETCH_CLASS */
-    public function selectClass(string $sql, array $params, string $class, array $ctorArgs = []): array
-    {
-        [$sql2, $bind] = $this->prepareBindings($sql, $params);
-        $st = $this->pdo->prepare($sql2);
-        $this->bindAll($st, $bind);
-        $st->execute();
-        return $st->fetchAll(PDO::FETCH_CLASS, $class, $ctorArgs);
-    }
-
-    /** FETCH_COLUMN into array */
-    public function selectColumn(string $sql, array $params = [], int $column = 0): array
-    {
-        [$sql2, $bind] = $this->prepareBindings($sql, $params);
-        $st = $this->pdo->prepare($sql2);
-        $this->bindAll($st, $bind);
-        $st->execute();
-        $out = [];
-        while (($v = $st->fetchColumn($column)) !== false) $out[] = $v;
-        return $out;
-    }
-
-    /** FETCH_KEY_PAIR (first col -> second col) */
-    public function selectPairs(string $sql, array $params = []): array
-    {
-        [$sql2, $bind] = $this->prepareBindings($sql, $params);
-        $st = $this->pdo->prepare($sql2);
-        $this->bindAll($st, $bind);
-        $st->execute();
-        return $st->fetchAll(PDO::FETCH_KEY_PAIR);
-    }
-
-    // ---------- Assoc helpers for SET/INSERT ----------
-
     public function set(array $assoc, string $prefix = 'p'): string
     {
         $parts = [];
@@ -121,26 +75,6 @@ final class PDOAbstract
         return implode(',', $parts);
     }
 
-    public function cols(array $assoc): string
-    {
-        return implode(',', array_map([$this, 'qid'], array_keys($assoc)));
-    }
-
-    public function marks(array $assoc, string $prefix = 'p'): string
-    {
-        $marks = [];
-        foreach ($assoc as $k => $_) $marks[] = ':' . $this->pf($prefix, $k);
-        return implode(',', $marks);
-    }
-
-    public function flatten(array $assoc, string $prefix = 'p'): array
-    {
-        $out = [];
-        foreach ($assoc as $k => $v) $out[$this->pf($prefix, $k)] = $v;
-        return $out;
-    }
-
-    // ---------- Internals ----------
 
     private function prepareBindings(string $sql, array $params): array
     {
