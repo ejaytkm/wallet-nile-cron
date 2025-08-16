@@ -15,6 +15,7 @@ final readonly class QueueController {
         $site   = (string) ($req->post['site'] ?? '');
         $module = (string) ($req->post['module'] ?? '');
         $mid   =  $req->post['mid'] ?? [];
+        $cronId = (int) ($req->post['cronId'] ?? 0);
 
         if ($site === '' || $module === '' || !$mid) {
             $res->status(400);
@@ -23,19 +24,18 @@ final readonly class QueueController {
             return;
         }
 
-        $job = $this->syncbet->fireOrQueue(
+        $jobData = $this->syncbet->fireOrQueue(
             $mid,
             $site,
-            $module
+            $module,
+            $cronId
         );
 
         $res->header('Content-Type','application/json');
         $res->end(json_encode([
             'status'=>'OK',
             'message' => 'Job has been queued successfully.',
-            'data' => [
-                'job' => $job
-            ]
+            'data' =>$jobData
         ]));
     }
 }

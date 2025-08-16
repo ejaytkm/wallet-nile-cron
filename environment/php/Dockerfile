@@ -15,10 +15,9 @@ RUN apk add --no-cache \
       unzip \
       supervisor \
     && update-ca-certificates \
-    && docker-php-ext-install pdo_mysql \
+    && docker-php-ext-install pdo_mysql mysqli opcache sockets \
     && pecl install swoole xdebug \
     && docker-php-ext-enable swoole xdebug \
-    && docker-php-ext-install opcache \
     && echo "opcache.enable_cli=1" > /usr/local/etc/php/conf.d/opcache-cli.ini \
     && echo "memory_limit=1024M" > /usr/local/etc/php/conf.d/memory.ini \
     # Install Composer (latest stable)
