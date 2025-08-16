@@ -6,10 +6,8 @@ namespace App\Repositories;
 use MeekroDB;
 use MeekroDBException;
 
-final class JobRepo
+final class JobRepo extends BaseRepository
 {
-    private MeekroDB $db;
-
     public function __construct($db = null)
     {
         if ($db) {

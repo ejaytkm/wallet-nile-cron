@@ -9,6 +9,7 @@ use App\Repositories\MerchantRepo;
 
 $merchantRp = new MerchantRepo();
 $jobsRp = new JobRepo();
+$wrodb = $merchantRp->getDB();
 
 $jobsConfig= [
     'JILI'  => [5, 'jili'],
@@ -16,8 +17,16 @@ $jobsConfig= [
     'JILI3' => [5, 'jili']
 ];
 
+$currentTimestamp = strtotime('now');
+
+$cron = [];
+$cronjobs = $wrodb->query("SELECT * FROM cron_jobs");
+foreach ($cronjobs as $c) {
+    $cron[$c['merchant_id']][$c['code']] = $c;
+}
+
 # current: 2952 merchants to loop and fire
-$mIds = $merchantRp->fetchAllActiveMerchants();
+$mIds = $wrodb->queryFirstColumn("SELECT id FROM merchants WHERE status = 'ACTIVE'");
 foreach ($mIds as $mId) {
     $uniq = [];
     $cacheKey = 'USEDSITE-' . $mId;
@@ -26,9 +35,6 @@ foreach ($mIds as $mId) {
     $as = cacheDataFile($cacheKey); // TODO: redis cache
     if (!is_array($as)) {
         $as = [];
-
-        // @TODO
-        die('ok test');
 
         $sites = $wrodb->queryFirstColumn("SELECT site_name FROM pwd_merchant_site WHERE merchant_id = %i AND status = 'ACTIVE' AND key_1 IS NOT NULL", $mId);
         if (!empty($sites)) {
@@ -41,11 +47,20 @@ foreach ($mIds as $mId) {
                 }
             }
         }
+
+        die(json_encode([
+            'merchant_id' => $mId,
+            'sites'       => $as
+        ]));
+
+        // @TODO: this is actually a redis cache, not a file cache
         cacheDataFile($cacheKey, $as, 300);
     }
 
-    // @TODO: Extract this into a separate function
-    die('ok test');
+    die(json_encode([
+        'merchant_id' => $mId,
+        'sites'       => $as
+    ]));
 
     foreach ($as as $site) {
         if (strtotime($statusDateTime) + $job[0] * 60 > $currentTimestamp) {

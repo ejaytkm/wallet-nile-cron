@@ -1,29 +1,28 @@
 # TODO
+# Cron server
+- Write the cronjob server that executes the based on php files
+- Connection to redis 
+- Boons cron script MUST RUN - preferably concurrently
+- Cronjob swoole server should be run on a ticker timer
+
 # Gate server
 // @TODO: How do we handle retries - put back and fire into maybe this coroutine again?
 // @TODO: Update the cronjob - MOVE back to PENDING for reprocessing
 // @TODO: IGNORE if cronjob is already running based on site/merchant_id
 
-# Cron server
-- Cronjob swoole server should be run on a ticker timer => pooling to database feature must work
-- Write the cronjob server that executes the based on php files 
-
-# infra
+# Swoole Infra
 - Graceful shutdown/restarts `IS A MUST`
 - Add redis/database to store whole fleet process count
 - Hot reload not exactly reloading
 
-# monitoring
+# Monitoring 
 - grafana dashboard for monitoring the cronjob server
 
-# 16 August -monitoring the new server
-- Gate http queue store mechanism
-- Cronjob mechanism
-# JOB MECHANISM
-- store -> run immediately -> if fail, move status to IN_QUEUE
-- cronjob to run
-- Stress testing the application till it breaks completely
-- mysql
+# Stress Testing 
+- ???? need to come up with some stress testing technique
+
+# Deployment
+- Monday
 
 # REQUIREMENTS
 # BOON

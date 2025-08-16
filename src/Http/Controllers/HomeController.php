@@ -8,7 +8,7 @@ use Psr\Log\LoggerInterface;
 use Swoole\Http\Response;
 use Swoole\Http\Request;
 
-final class TestController
+final class HomeController
 {
     public function __construct(private LoggerInterface $logger)
     {
@@ -17,10 +17,10 @@ final class TestController
     public function index(Request $req, Response $res): void
     {
         $response = [
-            'status' => 'ok',
+            "msg" => "Welcome to Nile Cron - proxy"
         ];
 
-        $this->logger->info('TestController index method called', [
+        $this->logger->info('HomeController index method called', [
             'request' => [
                 'method' => $req->server['request_method'],
                 'uri' => $req->server['request_uri'],
