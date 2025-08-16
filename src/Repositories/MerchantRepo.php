@@ -9,15 +9,17 @@ use PDO;
 
 final class MerchantRepo
 {
-    public function __construct(
-        private ?PDOAbstract $db = null
-    ) {
-        if ($db === null) {
+    private PDOAbstract $db;
+    public function __construct($connection)
+    {
+        if ($connection instanceof PDO) {
+            $this->db = new PDOAbstract($connection);
+        } else {
             $this->db = new PDOAbstract(
                 new PDO(
-                    env('DB_MERCHANT_DSN'),
-                    env('DB_MERCHANT_USER'),
-                    env('DB_MERCHANT_PASS')
+                    (string) env('DB_DSN'),
+                    (string) env('DB_USER'),
+                    (string) env('DB_PASS')
                 )
             );
         }

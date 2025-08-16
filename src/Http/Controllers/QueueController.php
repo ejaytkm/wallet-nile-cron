@@ -34,10 +34,7 @@ final readonly class QueueController {
             'status'=>'OK',
             'message' => 'Job has been queued successfully.',
             'data' => [
-                'site' => $site,
-                'module' => $module,
-                'mid' => $mid,
-                'job' => $job,
+                'job' => $job
             ]
         ]));
     }

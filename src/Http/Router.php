@@ -15,7 +15,7 @@ final class Router {
             $r->addRoute('GET', '/test', [Controllers\TestController::class, 'index']);
 
             // Queue Routes
-            $r->addRoute('POST', '/queue/syncbet', [Controllers\QueueController::class, 'syncBet']);
+            $r->addRoute('POST', '/queue/syncbethistory', [Controllers\QueueController::class, 'syncBet']);
         });
     }
     public function dispatch(string $method, string $uri): array {

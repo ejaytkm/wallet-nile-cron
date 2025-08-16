@@ -86,8 +86,8 @@ final class BaseServer
                 $res->end(json_encode(
                     [
                         'status'=>'error',
-                        'error'=>'internal',
                         'message'=>env('APP_DEBUG') ? $e->getMessage() : 'Internal Server Error',
+                        'error' => env('APP_DEBUG') ? $e->getTraceAsString() : null
                     ]
                 ));
             } finally {

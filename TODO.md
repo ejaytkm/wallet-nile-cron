@@ -1,13 +1,18 @@
 # TODO
+# gate server
 - Simple job processing for gates => create job -> if fail we mark as fail
-- Fire to server => IGNORE if cronjob is already running based on site/merchant_id
-- cron job to run http_job_queue then run syncbethistory
-- Prevent gate jobs from running if MID/MERCHANT_ID already running
-- Prevent batch job re-runs
+- SyncBetService => Fire to server => IGNORE if cronjob is already running based on site/merchant_id
+ 
+- Convert PDO process to use MYSQLi - sacrifice performance for simplicity
+- Cronjob swoole server should be run on a ticker timer => pooling to database feature must work 
+
+# cron server
+- Write the cronjob server that executes the based on php files 
+
+# infra
 - Graceful shutdown/restarts `IS A MUST`
 - Add redis/database to store whole fleet process count
-- Write the cronjob as one application???????
-- Per process, use that one PDO connection for REPOSITORIES
+
 
 # 15 August -monitoring the new server
 - Gate http queue store mechanism
@@ -38,3 +43,7 @@
 => throttling workers of 2000 RPS
 => when workers are in queue, how to handle the queue 
 => throttling 200 RPS, don't go over than that. 
+
+# DONE 
+- Prevent gate jobs from running if MID/MERCHANT_ID already running
+- Prevent batch job re-runs

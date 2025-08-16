@@ -1,3 +1,7 @@
+# CRON
+init-cron:
+	@docker start app exec -it -e XDEBUG_MODE=off wallet-nile-cron /usr/local/bin/composer install
+
 # INSTALL
 start:
 	@cd environment && docker-compose up -d
