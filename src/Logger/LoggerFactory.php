@@ -14,13 +14,12 @@ final class LoggerFactory
      * Create a new logger instance.
      *
      * @param string $name   Logger channel name.
-     * @param string $path   File path or stream for log output.
      */
     public static function build(
-        string $name = 'app',
-        string $path = 'php://stdout',
+        string $name = LoggerNameEnum::WORKER_NAME,
         Level $level = Level::Debug
     ): LoggerInterface {
+        $path = getAppRoot() . '/storage/logs/application.log';
         $logger = new Logger($name);
         $logger->pushHandler(new StreamHandler($path, $level));
         return $logger;

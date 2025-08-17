@@ -22,6 +22,7 @@ final class RegistryFactory
             : new InMemory();
         $reg = new CollectorRegistry($storage);
 
+        // @TODO: make this better
         // HTTP core
         $m['httpReqs']     = $reg->getOrRegisterCounter('ss_http','request_total','HTTP requests',['method','code']);
         $m['httpLatency']  = $reg->getOrRegisterHistogram('ss_http','request_duration_seconds','HTTP request duration',['method','code'],[0.005,0.01,0.025,0.05,0.1,0.25,0.5,1,2,5,10]);
@@ -50,10 +51,6 @@ final class RegistryFactory
         $m['memPerWorker'] = $reg->getOrRegisterGauge('ss_http','memory_per_worker_bytes','Approx memory per worker');
         $m['coNum']        = $reg->getOrRegisterGauge('swoole','coroutines','Active coroutines');
         $m['coPeek']       = $reg->getOrRegisterGauge('swoole','coroutines_peek','Coroutine peek num');
-
-        // Reloads (optional if stats exposes it)
-        $m['reloadCount']  = $reg->getOrRegisterCounter('ss_http','reload_count','Reload count');
-        $m['lastReload']   = $reg->getOrRegisterGauge('ss_http','latest_reload_timestamp','Latest reload time (unix)');
 
         // Jobs (kept for /batch/syncbet simulation)
         $m['jobsOk']       = $reg->getOrRegisterCounter('ss_jobs','jobs_ok','Jobs OK',['module','site']);

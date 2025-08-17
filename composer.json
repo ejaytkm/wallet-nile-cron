@@ -15,7 +15,8 @@
     "psr/container": "^2.0",
     "monolog/monolog": "^3.9",
     "ext-sockets": "*",
-    "sergeytsalkov/meekrodb": "^3.1"
+    "sergeytsalkov/meekrodb": "^3.1",
+    "predis/predis": "^3.2"
   },
   "autoload": {
     "psr-4": {

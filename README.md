@@ -12,3 +12,12 @@ Start the PHP environment with Docker:
 make build
 ```
 
+# Errors? 
+
+```shell
+Fatal error: Uncaught MeekroDBException: SQLSTATE[HY000] [2002] No such file or directory in /var/app/current/vendor/sergeytsalkov/meekrodb/db.class.php:212
+```
+
+
+# Dev Ops
+# Requirements

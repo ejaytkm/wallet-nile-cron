@@ -3,102 +3,149 @@ declare(strict_types=1);
 
 namespace App\Domain\SyncBet;
 
+use App\Logger\LoggerFactory;
+use App\Repositories\Enum\JobTypeEnum;
 use App\Repositories\Enum\QueueJobStatusEnum;
 use App\Repositories\JobRepo;
-use App\Utils\GuzzleUtil;
+use Carbon\Carbon;
 use GuzzleHttp\Exception\ConnectException;
 use Swoole\Coroutine;
 
 final class SyncBetService
 {
-    public function __construct(private JobRepo $jobRepo)
+    public function __construct(
+        private JobRepo $jobRepo,
+    )
     {
-        // instantiate db
     }
 
-    /**
-     * @throws \MeekroDBException
-     */
+    public function reQueue(int $jobId): array
+    {
+        $job = $this->jobRepo->getQJob($jobId);
+        if (!$job) {
+            throw new \RuntimeException("Job with ID {$jobId} not found.");
+        }
+
+        if (
+            $job['status'] === QueueJobStatusEnum::IN_FLIGHT
+        ) {
+            throw new \RuntimeException("Job with ID {$jobId} is currently in flight and cannot be re-queued.");
+        }
+
+        return $this->fireOrQueue(
+            (int)$job['payload']['merchantId'],
+            (string)$job['payload']['site'],
+            (string)$job['payload']['module'],
+            (int)$job['cronId'],
+            $job
+        );
+    }
+
     public function fireOrQueue(
         int $mid,
         string $site,
         string $module,
-        int $cronId = 0
+        int $cronId,
+        array $job = []
     ): array
     {
         $maxCo = (int)env('MAX_CONCURRENCY');
         $running = Coroutine::stats()['coroutine_num'] ?? 0;
-        $payload = [
-            'module'          => '/betHistory/' . $module,
-            'access_id'       => 'sync_bet',
-            'access_token'    => 'sync_bet',
-            'non_transaction' => 1,
-            'mid'             => $mid,
-            'site'            => $site,
-        ];
 
-        $job = $this->jobRepo->createQueueJob(
-            $payload,
-            $cronId,
-            QueueJobStatusEnum::IN_QUEUE
-        );
+        if (empty($job)) {
+            $payload = [
+                'merchantId'      => $mid,
+                'module'          => '/betHistory/' . $module,
+                'accessId'       => (int) env('WALLET_SYSTEM_ADMIN_ACCESS_ID'),
+                'accessToken'    => env('WALLET_SYSTEM_ADMIN_TOKEN'),
+                'nonTransaction' => 1,
+                'site'            => $site,
+            ];
+            $job = $this->jobRepo->createQJob([
+                'type'     => JobTypeEnum::JOB_SYNC_BET,
+                "payload"  => $payload,
+                "cronId"   => $cronId,
+                "status"   => QueueJobStatusEnum::IN_QUEUE,
+                "attempts" => 0
+            ]);
+        }
 
         if ($running < ($maxCo * 0.9)) {
             $job['status'] = QueueJobStatusEnum::IN_FLIGHT;
             Coroutine::create(function () use ($job) {
                 $jobRepo = new JobRepo();
+                $logger = LoggerFactory::build();
+                $now = Carbon::now();
+                $payload = $job['payload'];
+                $start = microtime(true);
 
                 try {
-                    $job['status'] = $this->selfApi($job);
+                    $res = selfWalletApi($payload);
+
+                    // WALLET SERVER - Response Validations
+                    $parsed = json_decode($res['body'], true);
+                    if (isset($parsed['status']) && $parsed['status'] !== 'success') {
+                        $logger->error('SyncBetService::fireOrQueue - Invalid response from SelfWalletApi', [
+                            'job_id'   => $job['id'],
+                            'response' => $res['body']
+                        ]);
+                        throw new \RuntimeException(
+                            'Invalid response from SelfWalletApi: ' . $res['body']
+                        );
+                    }
+                    $job['status'] = QueueJobStatusEnum::COMPLETED;
+                } catch (ConnectException $e) {
+                    $job['status'] = str_contains($e->getMessage(), 'timed out')
+                        ? QueueJobStatusEnum::TIMED_OUT
+                        : QueueJobStatusEnum::FAILED;
                 } catch (\Throwable $e) {
                     // @TODO: How do we handle retries - put back and fire into maybe this coroutine again?
-
                     $job['status'] = QueueJobStatusEnum::FAILED;
+                    $logger->error(' Error processing job', [
+                        'job_id' => $job['id'],
+                        'error'  => $e->getMessage(),
+                        'trace'  => $e->getTraceAsString(),
+                        'payload' => $payload
+                    ]);
                 }
 
-                $id = (int) $job['id'];
-                $jobRepo->updateQueueJob($id, [
-                    'status' => $job['status'],
-                    'attempts' => $job['attempts'] + 1
+                $id = $job['id'];
+                $jobRepo->updateQJob($id, [
+                    'status'       => $job['status'],
+                    'attempts'     => $job['attempts'] + 1,
+                    'completed_at' => $now,
+                    'duration'     => number_format(microtime(true) - $start, 2),
                 ]);
 
-                // @TODO: Update the cronjob - MOVE back to PENDING for reprocessing
+                $cronId = $job['cronId'] ?? 0;
+                if (
+                    $cronId !== 0 &&
+                    in_array($job['status'], [
+                        QueueJobStatusEnum::COMPLETED,
+                        QueueJobStatusEnum::TIMED_OUT
+                    ])
+                ) {
+                    $jobRepo->updateCJob($cronId, [
+                        'status'          => 'PENDING',
+                        'status_datetime' => $now
+                    ]);
+                }
+
+                $logger->info("Job ID: {$id} processed successfully with status: {$job['status']}", [
+                    'job_id'  => $id,
+                    'cron_id' => $cronId,
+                    'status'  => $job['status'],
+                    'payload' => $payload
+                ]);
             });
+        } else {
+            $logger = LoggerFactory::build();
+            $logger->info("No Running: $running, Max Concurrency: $maxCo. Skipping job:" . $job['id']
+            );
         }
 
         return [
             'job' => $job,
-            'decrypt' => [
-                'job.payload' => $this->jobRepo::decompressPayload($job['payload'])
-            ]
         ];
-    }
-
-    private function selfApi(array $job) : string
-    {
-        $target_url = env('WALLET_URL', 'http://localhost:8080') . '/api/v1/index.php';
-        $http = new GuzzleUtil();
-        $payload = json_decode($job['payload'], true) ?? [];
-
-        try {
-            $response = $http->execute('POST',
-                $target_url,
-                $payload,
-                [
-                    'Content-Type' => 'application/x-www-form-urlencoded'
-                ]
-            );
-
-            // Wallet nile response validations
-            if ($response['status'] <= 200 || $response['status'] > 299) {
-                throw new \RuntimeException(
-                    'Invalid response from SelfApi: ' . $response['body']
-                );
-            }
-
-            return QueueJobStatusEnum::COMPLETED;
-        } catch (ConnectException $e) {
-            return QueueJobStatusEnum::TIMED_OUT;
-        }
     }
 }

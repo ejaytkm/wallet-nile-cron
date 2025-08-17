@@ -21,35 +21,93 @@ final class JobRepo extends BaseRepository
         }
     }
 
+    public function createCJob($params = []): false|string
+    {
+        if (empty($params)) {
+            return false;
+        }
+
+        $requiredFields = ['merchant_id', 'code', 'type'];
+        foreach ($requiredFields as $field) {
+            if (!isset($params[$field])) {
+                throw new \InvalidArgumentException("Missing required field: $field");
+            }
+        }
+
+        $this->db->insert('cron_jobs', $params);
+        return $this->db->insertId();
+    }
+
     /**
      * @throws MeekroDBException
      */
-    public function createQueueJob(
-        array $payload,
-        ?int $cronJobId,
-        string $status,
-        ?string $uuid = null
-    ): array {
-        $uuid = $uuid ?: gen_uuid();
-        $this->db->insert('queue_jobs', [
-            'payload'      =>self::compressPayload($payload),
-            'cron_job_id'  => $cronJobId,
-            'status'       => $status,
-            'uuid'         => $uuid
-        ]);
+    public function updateCJob($id, $params = []): bool
+    {
+        if (empty($params)) {
+            return false;
+        }
 
-        $id = (int) $this->db->insertId();
-        $row = $this->db->queryFirstRow("SELECT * FROM queue_jobs WHERE id=%i", $id);
+        $d = $this->db->update('cron_jobs', $params, 'id=%i', $id);
+
+        if ($d === false) {
+            throw new MeekroDBException("Failed to update cron job with ID: $id");
+        }
+
+        return $this->db->affectedRows() >= 0;
+    }
+
+    public function getQJob(int $id): ?array
+    {
+        if ($id <= 0) {
+            throw new \InvalidArgumentException("Job ID must be a positive integer");
+        }
+
+        $row = $this->db->queryFirstRow(
+            "SELECT * FROM queue_jobs WHERE id=%i",
+            $id
+        );
 
         if (!$row) {
-            throw new MeekroDBException("Failed to create queue job with ID: $id");
-        };
+            return null;
+        }
 
         // HYDRATE TYPES
         $row['id']           = (int) $row['id'];
         $row['attempts']     = (int) $row['attempts'];
-        $row['max_attempts'] = (int) $row['max_attempts'];
-        $row['cron_job_id']  = $row['cron_job_id'] !== null ? (int) $row['cron_job_id'] : null;
+        $row['cronId']       = $row['cronId'] !== null ? (int) $row['cronId'] : null;
+        $row['payload']      = self::decompressPayload($row['payload']);
+
+        return $row;
+    }
+
+    public function createQJob($params = []): array
+    {
+        if (empty($params)) {
+            throw new \InvalidArgumentException("Parameters cannot be empty");
+        }
+
+        if (!empty($params['payload'])) {
+            $params['payload'] = self::compressPayload($params['payload']);
+        }
+
+        $this->db->insert('queue_jobs', $params);
+
+        $row = [
+            'id' => (int) $this->db->insertId(),
+        ];
+
+        foreach ($params as $key => $value) {
+            if ($key === 'payload') {
+                $row[$key] = self::decompressPayload($value);
+            } else {
+                $row[$key] = $value;
+            }
+        }
+
+        // HYDRATE TYPES
+        $row['id']           = (int) $row['id'];
+        $row['attempts']     = (int) $row['attempts'];
+        $row['cronId']  = $row['cronId'] !== null ? (int) $row['cronId'] : null;
 
         return $row;
     }
@@ -57,42 +115,21 @@ final class JobRepo extends BaseRepository
     /**
      * @throws MeekroDBException
      */
-    public function updateQueueJob(int $id,array $fields): bool
+    public function updateQJob(int $id,array $params): bool
     {
-        if (!$fields) return false;
-
-        // columns allowed by schema
-        $allowed = ['uuid','payload','attempts','max_attempts','status','completed_at','cron_job_id'];
-        $data = [];
-
-        foreach ($allowed as $col) {
-            if (!array_key_exists($col, $fields)) continue;
-            $val = $fields[$col];
-
-            if ($col === 'completed_at') {
-                if ($val instanceof \DateTimeInterface) {
-                    $val = $val->format('Y-m-d H:i:s.u');
-                } elseif ($val === '' || $val === false) {
-                    $val = null;
-                }
-            }
-
-            if (in_array($col, ['attempts','max_attempts','cron_job_id'], true)) {
-                $val = ($val === null) ? null : (int) $val;
-            }
-
-            if ($col === 'payload' && is_array($val)) {
-                $val = self::compressPayload($val);
-            }
-
-            $data[$col] = $val;
+        if (empty($params)) {
+            return false;
         }
 
-        if (!$data) return false;
+        $d = $this->db->update('queue_jobs', $params, 'id=%i', $id);
 
-        $this->db->update('queue_jobs', $data, 'id=%i', $id);
+        if ($d === false) {
+            throw new MeekroDBException("Failed to update cron job with ID: $id");
+        }
+
         return $this->db->affectedRows() >= 0;
     }
+
     static function compressPayload(array|string $payload): string
     {
         // Normalize to string
@@ -107,21 +144,15 @@ final class JobRepo extends BaseRepository
         return base64_encode($compressed);
     }
 
-    /**
-     * Decompress a payload stored by compressPayload().
-     * Returns array if JSON, otherwise string.
-     */
     static function decompressPayload(string $blob): array|string|null
     {
         try {
             $bin = base64_decode($blob, true);
             if ($bin === false) {
                 // not compressed — fallback to plain
-                $plain = $blob;
             } else {
                 $plain = gzuncompress($bin);
                 if ($plain === false) {
-                    // fallback to raw if somehow not compressed
                     $plain = $blob;
                 }
             }

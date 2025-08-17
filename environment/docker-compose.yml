@@ -14,6 +14,7 @@ services:
       - ../:/var/app/current
     extra_hosts:
       - "server.wallet.xdev:172.17.0.1" # Replace 172.17.0.1 with the IP you found
+      - "secure.wallet-nile-cron.xdev:172.17.0.1"
     working_dir: /var/app/current
     ports:
       - "9501:9501" # server port

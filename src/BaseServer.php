@@ -22,7 +22,7 @@ final class BaseServer
         private CollectorRegistry $registry,
         private array $m
     ) {
-        $debug = env('APP_DEBUG', false);
+        $debug = env('APP_RELOAD', false);
         $this->server = new Server(
             $config->host,
             $config->port
@@ -102,7 +102,7 @@ final class BaseServer
             echo "Worker #{$workerId} started.\n";
         });
 
-        $this->server->on('Shutdown', function ($server) {
+        $this->server->on('Shutdown', function () {
             echo "Swoole server is shutting down.\n";
             Shutdown::markStopping();
         });
@@ -121,7 +121,7 @@ final class BaseServer
 
         echo "Swoole listening on {$this->config->host}:{$this->config->port}, metrics on {$this->config->metricsHost}:{$this->config->metricsPort}\n";
 
-        $this->startHotReloadIfDebug();
+//        $this->startHotReloadIfDebug();
         $this->server->start();
     }
 
@@ -130,6 +130,9 @@ final class BaseServer
         return $this->server;
     }
 
+    /**
+     * @TODO: Fix feature
+     */
     private function startHotReloadIfDebug(): void
     {
         $debug = filter_var((string) env('APP_DEBUG', '0'), FILTER_VALIDATE_BOOL);
@@ -146,7 +149,6 @@ final class BaseServer
                 echo "\n[Hot Reload] Changes detected, reloading workers...\n";
 
                 $last = $hash;
-                // Hot reload all workers (graceful because reload_async + max_wait_time)
                 $this->server->reload();
             }
         });

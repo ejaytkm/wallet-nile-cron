@@ -9,25 +9,24 @@ start:
 build:
 	@cd environment && docker-compose up --build -d
 
+rebuild:
+	docker-compose up -d --force-recreate --no-build
+
 down:
 	@cd environment && docker-compose down
 
+# DEV
 app@install:
 	@docker start app exec -it -e XDEBUG_MODE=off wallet-nile-cron /usr/local/bin/composer install
 	@make app@restart
 	@printf "\nApplication dependencies installed successfully.\n"
 
-# DEV
 app@restart:
 	@docker restart wallet-nile-cron
 	@docker logs -f wallet-nile-cron --tail 10
 
 app@autoload:
-	@docker exec -it -e XDEBUG_MODE=off app /usr/local/bin/composer dump-autoload
-
-app@clean-cache:
-	@docker exec -it -e XDEBUG_MODE=off wallet-nile-cron php cache.php
-	@printf "Cache cleaned successfully.\n"
+	@docker exec -it -e XDEBUG_MODE=off wallet-nile-cron /usr/local/bin/composer dump-autoload
 
 app@swole-version:
 	@docker exec -it wallet-nile-cron php -r "echo swoole_version();"
@@ -44,3 +43,6 @@ docker@restart:
 ## COMMANDS
 app@cron:
 	@docker exec -it wallet-nile-cron php cron.php
+
+app@requeue:
+	@docker exec -it wallet-nile-cron php crond/requeue_jobs.php

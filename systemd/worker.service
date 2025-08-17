@@ -1,13 +1,13 @@
 [Unit]
-Description=App Serve
+Description=Cron Executable
 After=network.target
 
 [Service]
 Type=simple
 WorkingDirectory=/var/app/current
-ExecStart=/usr/bin/php /var/app/current/server.php
-Restart=on-failure
-RestartSec=5
+ExecStart=/usr/bin/php /var/app/current/cron.php
+Restart=always
+RestartSec=2
 
 [Install]
 WantedBy=multi-user.target

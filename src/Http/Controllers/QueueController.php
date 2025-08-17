@@ -14,10 +14,10 @@ final readonly class QueueController {
 
         $site   = (string) ($req->post['site'] ?? '');
         $module = (string) ($req->post['module'] ?? '');
-        $mid   =  $req->post['mid'] ?? [];
-        $cronId = (int) ($req->post['cronId'] ?? 0);
+        $merchantId   =  (int) $req->post['mid'] ?? [];
+        $cronId = (int) $req->post['cronId'] ?? 0;
 
-        if ($site === '' || $module === '' || !$mid) {
+        if ($site === '' || $module === '' || !$merchantId) {
             $res->status(400);
             $res->header('Content-Type','application/json');
             $res->end(json_encode(['status'=>'error','error'=>'invalid payload']));
@@ -25,7 +25,7 @@ final readonly class QueueController {
         }
 
         $jobData = $this->syncbet->fireOrQueue(
-            $mid,
+            $merchantId,
             $site,
             $module,
             $cronId
@@ -35,6 +35,30 @@ final readonly class QueueController {
         $res->end(json_encode([
             'status'=>'OK',
             'message' => 'Job has been queued successfully.',
+            'data' =>$jobData
+        ]));
+    }
+
+    public function syncBetRequeue(Request $req, Response $res): void {
+        if (str_contains($req->header['content-type'], 'application/json')) {
+            $req->post = json_decode($req->rawContent(), true);
+        }
+
+        $jobId = (int) ($req->post['jobId'] ?? 0);
+
+        if (!$jobId) {
+            $res->status(400);
+            $res->header('Content-Type','application/json');
+            $res->end(json_encode(['status'=>'error','error'=>'invalid job ID']));
+            return;
+        }
+
+        $jobData = $this->syncbet->reQueue($jobId);
+
+        $res->header('Content-Type','application/json');
+        $res->end(json_encode([
+            'status'=>'OK',
+            'message' => 'Job has been re-queued successfully.',
             'data' =>$jobData
         ]));
     }
