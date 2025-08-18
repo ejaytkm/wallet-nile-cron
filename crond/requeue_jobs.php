@@ -11,7 +11,7 @@ $jobsRp = new App\Repositories\JobRepo();
 $jobsdb = $jobsRp->getDB();
 $total_fired = 0;
 
-$qJobs = $jobsdb->query("SELECT id FROM queue_jobs WHERE status = 'IN_QUEUE'  LIMIT 1000");
+$qJobs = $jobsdb->query("SELECT id FROM queue_jobs WHERE status = 'IN_QUEUE'  LIMIT 200");
 
 // Fire the jobs that are still in queue
 foreach ($qJobs as $c) {
@@ -20,8 +20,6 @@ foreach ($qJobs as $c) {
             'jobId' => (int) $c['id']
         ]);
         $total_fired++;
-
-        // @TODO: check if cronjob is still running
     } catch (Exception $e) {
         echo "Error firing job ID {$c['id']}: " . $e->getMessage() . "\n";
     }
