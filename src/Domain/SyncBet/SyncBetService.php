@@ -24,17 +24,18 @@ final class SyncBetService
 
     public function reQueue(int $jobId): array
     {
-        $job = $this->jobRepo->getQJob($jobId);
+        $jobsRepo =  (new JobRepo());
+        $job = $jobsRepo->getQJob($jobId);
         if (!$job) {
             throw new \RuntimeException("Job with ID {$jobId} not found.");
         }
 
-        if (
-            $job['status'] === QueueJobStatusEnum::IN_FLIGHT
+        if ($job['status'] === QueueJobStatusEnum::IN_FLIGHT
         ) {
             throw new \RuntimeException("Job with ID {$jobId} is currently in flight and cannot be re-queued.");
         }
 
+        $jobsRepo->getDB()->disconnect();
         return $this->fireOrQueue(
             (int)$job['payload']['merchantId'],
             (string)$job['payload']['site'],
@@ -77,12 +78,12 @@ final class SyncBetService
                 $now = Carbon::now();
                 $payload = $job['payload'];
                 $start = microtime(true);
-                $jobRepo = $this->jobRepo;
-
+                $jobRepo = new JobRepo();
                 $jobRepo->updateQJob($job['id'], [
                     'status'   => QueueJobStatusEnum::IN_FLIGHT,
                     'attempts' => $job['attempts'] + 1,
                 ]);
+                $jobRepo->getDB()->disconnect();
 
                 try {
                     $res = selfWalletApi($payload);

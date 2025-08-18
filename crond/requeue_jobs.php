@@ -16,9 +16,11 @@ $qJobs = $jobsdb->query("SELECT id FROM queue_jobs WHERE status = 'IN_QUEUE'  LI
 foreach ($qJobs as $c) {
     try {
         selfWorkerApi('/requeue/syncbethistory', [
-            'jobId' => $c['id']
+            'jobId' => (int) $c['id']
         ]);
         $total_fired++;
+
+        // @TODO: check if cronjob is still running
     } catch (Exception $e) {
         echo "Error firing job ID {$c['id']}: " . $e->getMessage() . "\n";
     }
