@@ -18,7 +18,6 @@ final class JobRepo extends BaseRepository
                 (string) env('DB_USER'),
                 (string) env('DB_PASS'),
                 [
-                    \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
                     \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
                     \PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
                 ]
@@ -67,7 +66,7 @@ final class JobRepo extends BaseRepository
             throw new \InvalidArgumentException("Job ID must be a positive integer");
         }
 
-        $row = $this->db->queryFirstColumn(
+        $row = $this->db->queryFirstRow(
             "SELECT * FROM queue_jobs WHERE id = %i",
             $id
         );
@@ -80,8 +79,7 @@ final class JobRepo extends BaseRepository
         $row['id']           = (int) $row['id'];
         $row['attempts']     = (int) $row['attempts'];
         $row['cronId']       = $row['cronId'] !== null ? (int) $row['cronId'] : null;
-        $row['payload']      = self::decompressPayload($row['payload'])
-        ;
+        $row['payload']      = self::decompressPayload($row['payload']);
         return $row;
     }
 

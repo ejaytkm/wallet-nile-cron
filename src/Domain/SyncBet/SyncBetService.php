@@ -74,7 +74,6 @@ final class SyncBetService
         if (!self::isCoroutineFull()) {
             $job['status'] = QueueJobStatusEnum::IN_FLIGHT;
             Coroutine::create(function () use ($job) {
-                $logger = LoggerFactory::build();
                 $now = Carbon::now();
                 $payload = $job['payload'];
                 $start = microtime(true);
@@ -85,6 +84,7 @@ final class SyncBetService
                 ]);
                 $jobRepo->getDB()->disconnect();
 
+                echo "Processing job ID: {$job['id']} with payload: " . json_encode($payload) . "\n";
                 try {
                     $res = selfWalletApi($payload);
                     $parsed = json_decode($res['body'], true);
@@ -98,12 +98,10 @@ final class SyncBetService
                         }
                     } else {
                         $job['status'] = QueueJobStatusEnum::COMPLETED;
-                        $job['completed_at'] = Carbon::now();
                     }
                 } catch (\Throwable $e) {
                     if ($e instanceof ConnectException && str_contains($e->getMessage(), 'timed out')) {
                         $job['status'] = QueueJobStatusEnum::TIMED_OUT;
-                        $job['completed_at'] = Carbon::now();
                     } else {
                         if ((int)$job['attempts'] >= SyncBetService::MAX_ATTEMPTS) {
                             $job['status'] = QueueJobStatusEnum::FAILED;
@@ -112,22 +110,16 @@ final class SyncBetService
                             $job['status'] = QueueJobStatusEnum::IN_QUEUE;
                         }
                     }
-
-                    $logger->error('SyncBetService - Error processing job', [
-                        'errMsg'  => $e->getMessage(),
-                        'job' => $job,
-                        'payload' => $payload,
-                        'exception' => $e->getTrace()
-                    ]);
                 }
 
                 $id = $job['id'];
                 $jobRepo->updateQJob($id, [
                     'status'       => $job['status'],
-                    'completed_at' => $job['completed_at'] ?? null,
+                    'executed_at' => Carbon::now(),
                     'available_at' => $job['available_at'] ?? null,
                     'duration'     => number_format(microtime(true) - $start),
                 ]);
+                echo "Job ID: {$id} completed with status: {$job['status']} in " . number_format(microtime(true) - $start) . " seconds.\n";
 
                 $cronId = $job['cronId'] ?? 0;
                 if ($cronId && in_array($job['status'], [

@@ -1,5 +1,6 @@
 <?php
-// runs every 10 seconds to requeue jobs that are in IN_QUEUE status and have 0 attempts
+// RPS = 200
+// called every 10 seconds
 declare(strict_types=1);
 
 $startTime = microtime(true);
@@ -10,7 +11,7 @@ $jobsRp = new App\Repositories\JobRepo();
 $jobsdb = $jobsRp->getDB();
 $total_fired = 0;
 
-$qJobs = $jobsdb->query("SELECT id FROM queue_jobs WHERE status = 'IN_QUEUE'  LIMIT 500");
+$qJobs = $jobsdb->query("SELECT id FROM queue_jobs WHERE status = 'IN_QUEUE'  LIMIT 1000");
 
 // Fire the jobs that are still in queue
 foreach ($qJobs as $c) {

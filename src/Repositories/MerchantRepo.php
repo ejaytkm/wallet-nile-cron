@@ -16,7 +16,11 @@ final class MerchantRepo extends BaseRepository
             $this->db = new MeekroDB(
                 (string) env('DB_MERCHANT_DSN'),
                 (string) env('DB_MERCHANT_USER'),
-                (string) env('DB_MERCHANT_PASS')
+                (string) env('DB_MERCHANT_PASS'),
+                [
+                    \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
+                    \PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
+                ]
             );
         }
     }
