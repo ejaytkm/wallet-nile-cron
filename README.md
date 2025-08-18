@@ -2,6 +2,8 @@
 
 Massively concurrent cURL using Swoole coroutines with throttling (global/per-host), plus a simple dispatcher.
 
+![queue_chart.png](storage/docs/workflow.png)
+
 ## Environment
 See `/environment/` for how to set up and download packages for full environment.
 
