@@ -3,7 +3,6 @@ declare(strict_types=1);
 
 namespace App\Domain\SyncBet;
 
-use App\Logger\LoggerFactory;
 use App\Repositories\Enum\JobTypeEnum;
 use App\Repositories\Enum\QueueJobStatusEnum;
 use App\Repositories\JobRepo;
