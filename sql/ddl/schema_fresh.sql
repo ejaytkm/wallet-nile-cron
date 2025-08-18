@@ -31,6 +31,7 @@ CREATE table queue_jobs
     `attempts`     TINYINT UNSIGNED DEFAULT 0 COMMENT 'This will be handled by coroutines',
     `status`       ENUM ('CREATED', 'IN_QUEUE', 'IN_FLIGHT', 'COMPLETED', 'TIMED_OUT', 'FAILED') NOT NULL DEFAULT 'CREATED',
     `duration`     FLOAT(10, 3)     NULL DEFAULT NULL COMMENT 'Duration in seconds',
+    `available_at` DATETIME(3)         NULL DEFAULT  NULL,
     `completed_at` DATETIME(3)         NULL DEFAULT  NULL,
     `created_at`   DATETIME(3)             DEFAULT CURRENT_TIMESTAMP(3),
     `updated_at`   DATETIME(3)             DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)

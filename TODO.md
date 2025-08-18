@@ -1,18 +1,17 @@
 # TODO
 # Gate server
-@TODO: How do we handle retries - put back and fire into maybe this coroutine again?
-@TODO: How do we handle throttling - we need to throttle the requests to the gate server
-@TODO: grafana + prometheus dashboard for monitoring the cronjob server
-@Cronjob server -> should be completed 
+- @TODO: How do we handle retries - put back and fire into maybe this coroutine again? default to 3 retries, don't forget to sleep for 1 second before retrying
+- @TODO: How do we handle throttling - we need to throttle the requests to the gate server
+- @TODO: grafana + prometheus dashboard for monitoring the cronjob server
+- @Cronjob server -> should be completed 
+- @server slow during startup? why? 
+- @convert the MeekroORM into a PDO straight
 
 # Swoole Infra
-- Fix graceful shutdown/restarts `IS A MUST`
-- A worker must stop accepting new requests when it is shutting down ~ don't worry about co-routines
-- A worker must wait for all request/coroutines in its context before it can do a shutdown
-- Database partitioning - how to handle the database partitioning
-
-# Stress Testing
-- ???? need to come up with some stress testing technique
+- @Fix graceful shutdown/restarts `IS A MUST`
+- @A worker must stop accepting new requests when it is shutting down ~ don't worry about co-routines
+- @A worker must wait for all request/coroutines in its context before it can do a shutdown
+- @Database partitioning - how to handle the database partitioning
 
 # Cron server
 - Write the cronjob server that executes the based on php files
@@ -21,6 +20,9 @@
 
 # Deployment
 - Monday
+
+# Stress Testing
+- ? need to come up with some stress testing technique
 
 # REQUIREMENTS
 # BOON

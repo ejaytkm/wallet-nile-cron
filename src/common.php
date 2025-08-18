@@ -16,7 +16,7 @@ function selfWalletApi(array $payload): array
         throw new \InvalidArgumentException('Merchant ID (mid) is required in the payload.');
     }
 
-    $http = new GuzzleUtil(60, 60);
+    $http = new GuzzleUtil(62, 32);
     $url = getMerchantServerConfig($payload['merchantId'], 'APIURL');
 
     $headers = [

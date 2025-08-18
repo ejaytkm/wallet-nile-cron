@@ -13,6 +13,9 @@ use Swoole\Coroutine;
 
 final class SyncBetService
 {
+    const int MAX_ATTEMPTS = 3;
+    const int ATTEMPT_DELAY = 2;
+
     public function __construct(
         private JobRepo $jobRepo,
     )
@@ -49,17 +52,14 @@ final class SyncBetService
         array $job = []
     ): array
     {
-        $maxCo = (int)env('MAX_CONCURRENCY');
-        $running = Coroutine::stats()['coroutine_num'] ?? 0;
-
         if (empty($job)) {
             $payload = [
-                'merchantId'      => $mid,
-                'module'          => '/betHistory/' . $module,
-                'accessId'       => (int) env('WALLET_SYSTEM_ADMIN_ACCESS_ID'),
+                'merchantId'     => $mid,
+                'module'         => '/betHistory/' . $module,
+                'accessId'       => (int)env('WALLET_SYSTEM_ADMIN_ACCESS_ID'),
                 'accessToken'    => env('WALLET_SYSTEM_ADMIN_TOKEN'),
                 'nonTransaction' => 1,
-                'site'            => $site,
+                'site'           => $site,
             ];
             $job = $this->jobRepo->createQJob([
                 'type'     => JobTypeEnum::JOB_SYNC_BET,
@@ -70,82 +70,89 @@ final class SyncBetService
             ]);
         }
 
-        if ($running < ($maxCo * 0.9)) {
+        if (!self::isCoroutineFull()) {
             $job['status'] = QueueJobStatusEnum::IN_FLIGHT;
             Coroutine::create(function () use ($job) {
-                $jobRepo = new JobRepo();
                 $logger = LoggerFactory::build();
                 $now = Carbon::now();
                 $payload = $job['payload'];
                 $start = microtime(true);
+                $jobRepo = $this->jobRepo;
+
+                $jobRepo->updateQJob($job['id'], [
+                    'status'   => QueueJobStatusEnum::IN_FLIGHT,
+                    'attempts' => $job['attempts'] + 1,
+                ]);
 
                 try {
                     $res = selfWalletApi($payload);
-
-                    // WALLET SERVER - Response Validations
                     $parsed = json_decode($res['body'], true);
+
                     if (isset($parsed['status']) && $parsed['status'] !== 'success') {
-                        $logger->error('SyncBetService::fireOrQueue - Invalid response from SelfWalletApi', [
-                            'job_id'   => $job['id'],
-                            'response' => $res['body']
-                        ]);
-                        throw new \RuntimeException(
-                            'Invalid response from SelfWalletApi: ' . $res['body']
-                        );
+                        if ((int)$job['attempts'] >= SyncBetService::MAX_ATTEMPTS) {
+                            $job['status'] = QueueJobStatusEnum::FAILED;
+                        } else {
+                            $job['available_at'] = Carbon::now()->addSeconds(self::ATTEMPT_DELAY);
+                            $job['status'] = QueueJobStatusEnum::IN_QUEUE;
+                        }
+                    } else {
+                        $job['status'] = QueueJobStatusEnum::COMPLETED;
+                        $job['completed_at'] = Carbon::now();
                     }
-                    $job['status'] = QueueJobStatusEnum::COMPLETED;
-                } catch (ConnectException $e) {
-                    $job['status'] = str_contains($e->getMessage(), 'timed out')
-                        ? QueueJobStatusEnum::TIMED_OUT
-                        : QueueJobStatusEnum::FAILED;
                 } catch (\Throwable $e) {
-                    // @TODO: How do we handle retries - put back and fire into maybe this coroutine again?
-                    $job['status'] = QueueJobStatusEnum::FAILED;
-                    $logger->error(' Error processing job', [
-                        'job_id' => $job['id'],
-                        'error'  => $e->getMessage(),
-                        'trace'  => $e->getTraceAsString(),
-                        'payload' => $payload
+                    if ($e instanceof ConnectException && str_contains($e->getMessage(), 'timed out')) {
+                        $job['status'] = QueueJobStatusEnum::TIMED_OUT;
+                        $job['completed_at'] = Carbon::now();
+                    } else {
+                        if ((int)$job['attempts'] >= SyncBetService::MAX_ATTEMPTS) {
+                            $job['status'] = QueueJobStatusEnum::FAILED;
+                        } else {
+                            $job['available_at'] = Carbon::now()->addSeconds(self::ATTEMPT_DELAY);
+                            $job['status'] = QueueJobStatusEnum::IN_QUEUE;
+                        }
+                    }
+
+                    $logger->error('SyncBetService - Error processing job', [
+                        'errMsg'  => $e->getMessage(),
+                        'job' => $job,
+                        'payload' => $payload,
+                        'exception' => $e->getTrace()
                     ]);
                 }
 
                 $id = $job['id'];
                 $jobRepo->updateQJob($id, [
                     'status'       => $job['status'],
-                    'attempts'     => $job['attempts'] + 1,
-                    'completed_at' => $now,
-                    'duration'     => number_format(microtime(true) - $start, 2),
+                    'completed_at' => $job['completed_at'] ?? null,
+                    'available_at' => $job['available_at'] ?? null,
+                    'duration'     => number_format(microtime(true) - $start),
                 ]);
 
                 $cronId = $job['cronId'] ?? 0;
-                if (
-                    $cronId !== 0 &&
-                    in_array($job['status'], [
+                if ($cronId && in_array($job['status'], [
                         QueueJobStatusEnum::COMPLETED,
                         QueueJobStatusEnum::TIMED_OUT
-                    ])
-                ) {
+                    ])) {
                     $jobRepo->updateCJob($cronId, [
                         'status'          => 'PENDING',
                         'status_datetime' => $now
                     ]);
                 }
-
-                $logger->info("Job ID: {$id} processed successfully with status: {$job['status']}", [
-                    'job_id'  => $id,
-                    'cron_id' => $cronId,
-                    'status'  => $job['status'],
-                    'payload' => $payload
-                ]);
             });
         } else {
-            $logger = LoggerFactory::build();
-            $logger->info("No Running: $running, Max Concurrency: $maxCo. Skipping job:" . $job['id']
-            );
+            echo "Job ID: {$job['id']} is queued due to coroutine limit.\n";
         }
 
         return [
             'job' => $job,
         ];
+    }
+
+    private static function isCoroutineFull(): bool
+    {
+        $maxCo = (int)env('MAX_CONCURRENCY');
+        $running = Coroutine::stats()['coroutine_num'] ?? 0;
+
+        return $running >= ($maxCo * 0.95);
     }
 }

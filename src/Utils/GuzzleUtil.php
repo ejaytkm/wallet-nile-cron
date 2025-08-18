@@ -28,7 +28,7 @@ final class GuzzleUtil
             'verify'          => $this->verify,
             'timeout'         => $this->timeout,
             'connect_timeout' => $this->connectTimeout,
-            'http_errors'     => false,
+            'http_errors'     => true,
         ]);
     }
 

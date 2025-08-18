@@ -32,6 +32,16 @@ app@swole-version:
 	@docker exec -it wallet-nile-cron php -r "echo swoole_version();"
 	@printf "\nSwoole version displayed successfully."
 
+## COMMANDS
+app@cron:
+	@docker exec -it wallet-nile-cron php cron.php
+
+app@cron-requeue:
+	@docker exec -it wallet-nile-cron php crond/requeue_jobs.php
+
+app@cron-syncbet:
+	@docker exec -it wallet-nile-cron php crond/sync_bet_history.php
+
 ## DOCKER
 docker@tail-logs:
 	@docker logs -f wallet-nile-cron
@@ -40,9 +50,7 @@ docker@restart:
 	@docker restart wallet-nile-cron
 	@printf "Docker wallet-nile environment successfully restarted.\n"
 
-## COMMANDS
-app@cron:
-	@docker exec -it wallet-nile-cron php cron.php
-
-app@requeue:
-	@docker exec -it wallet-nile-cron php crond/requeue_jobs.php
+## REDIS
+redis@flush:
+	@docker exec -it shared-services_redis redis-cli FLUSHALL
+	@printf "Redis database flushed successfully.\n"

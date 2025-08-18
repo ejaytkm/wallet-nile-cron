@@ -2,8 +2,8 @@
 declare(strict_types=1);
 
 $startTime = microtime(true);
-require __DIR__ . '/../vendor/autoload.php';
-require __DIR__ . '/../src/bootstrap.php';
+require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../src/bootstrap.php';
 
 use App\Repositories\Enum\JobTypeEnum;
 use Carbon\Carbon;
@@ -180,7 +180,7 @@ foreach ($mIds as $mId) {
     }
 }
 
-// Roughly 10-20 seconds
-// total fired: 1583
-echo "Total time taken: " . (microtime(true) - $startTime) . " seconds\n";
-echo "Total fired: " . $total_fired . "\n";
+$file = __FILE__;
+echo "Executed script: $file\n";
+echo "TotalFired:" . $total_fired  .
+    "|ExecTime:" . (microtime(true) - $startTime) . "s\n";
