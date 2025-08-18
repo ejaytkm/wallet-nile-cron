@@ -151,8 +151,8 @@ foreach ($mIds as $mId) {
         if (!empty($job[1]) && empty($uniq[$job[1]])) {
             $uniq[$job[1]] = 1;
             try {
-                selfWorkerApi('/queue/syncbethistory', [
-                    "mid" => $mId,
+                selfWalletNileApi('/api/curl', [
+                    "merchantId" => $mId,
                     "site" => $site,
                     "module" => $job[1],
                     "cronId" => $data['cronId']
@@ -166,8 +166,8 @@ foreach ($mIds as $mId) {
         if (!empty($job[2]) && empty($uniq[$job[2]])) {
             $uniq[$job[2]] = 1;
             try {
-                selfWorkerApi('/queue/syncbethistory', [
-                    "mid" => $mId,
+                selfWalletNileApi('/api/curl', [
+                    "merchantId" => $mId,
                     "site" => $site,
                     "module" => $job[2],
                     "cronId" => $data['cronId']

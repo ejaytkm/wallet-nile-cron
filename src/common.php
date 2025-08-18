@@ -27,13 +27,40 @@ function selfWalletApi(array $payload): array
     return $http->execute('POST', $url, $headers, $payload);
 }
 
+function selfWalletNileApi($path, array $payload): array
+{
+    $http = new GuzzleUtil();
+    $proxyUrl = getMerchantServerConfig($payload['merchantId'], 'APIURL');
+
+    $headers = [
+        'Content-Type' => 'application/json',
+        'Accept'       => 'application/json'
+    ];
+
+    $proxyPayload = [
+        'fire_and_forget' => true,
+        'url'             => $proxyUrl,
+        'method'          => 'POST',
+        'headers'         => $headers,
+        'payload'         => [
+            ...$payload,
+            'accessId'    => (int) env('WALLET_SYSTEM_ADMIN_ACCESS_ID'),
+            'accessToken' => (string) env('WALLET_SYSTEM_ADMIN_TOKEN'),
+        ]
+    ];
+    $url = 'http://' .  env('WALLET_NILE_URL') . $path;
+
+    echo "Proxying request to: $url - MID: {$payload['merchantId']} - SITE : {$payload['site']}\n";
+    return $http->execute('POST', $url, $headers, $proxyPayload);
+}
+
 function selfWorkerApi(string $path, array $payload): array
 {
     $http = new GuzzleUtil();
     $url = 'http://' . env('APP_WORKER_LB_URL', 'http://localhost:9501') . $path;
     $headers = [
         'Content-Type' => 'application/json',
-        'Accept' => 'application/json'
+        'Accept'       => 'application/json'
     ];
 
     return $http->execute('POST', $url, $headers, $payload);
@@ -61,13 +88,13 @@ function getMerchantServerConfig($merchantId, $attr): string
     }
 
     if ($attr === 'APIDIR') {
-        return 'http://'.$apiEndpoint.'/api/v1';
+        return 'http://' . $apiEndpoint . '/api/v1';
     } else if ($attr === 'APIURL') {
-        return 'http://'.$apiEndpoint.'/api/v1/index.php';
+        return 'http://' . $apiEndpoint . '/api/v1/index.php';
     } else if ($attr === 'CRONDIR') {
-        return 'http://'.$cronEndpoint.'/api/v1';
+        return 'http://' . $cronEndpoint . '/api/v1';
     } else if ($attr === 'CRONURL') {
-        return 'http://'.$cronEndpoint.'/api/v1/index.php';
+        return 'http://' . $cronEndpoint . '/api/v1/index.php';
     } else if ($attr === 'SERVERIP') {
         return $serverIP;
     }
