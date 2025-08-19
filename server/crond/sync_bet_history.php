@@ -1,22 +1,25 @@
 <?php
 declare(strict_types=1);
 
-$startTime = microtime(true);
-
 require_once __DIR__ . '/../../vendor/autoload.php';
 require_once __DIR__ . '/../../src/bootstrap.php';
 
 use Carbon\Carbon;
+use Psr\Log\LoggerInterface;
 
+global $container;
+
+$logger = $container->get(LoggerInterface::class);
+$startTime = microtime(true);
 $currentTimestamp = strtotime('now');
 $merchantRp = new App\Repositories\MerchantRepo;
 $wrodb = $merchantRp->getDB();
 $redis = new App\Utils\RedisUtil();
 
 $jobs = [
-    'JILI'  => [1, 'jili'],
-    'JILI2' => [1, 'jili'],
-    'JILI3' => [1, 'jili']
+    'JILI'  => [5, 'jili'],
+    'JILI2' => [5, 'jili'],
+    'JILI3' => [5, 'jili']
 ];
 $jobK = array_keys($jobs);
 $cron = [];
@@ -101,7 +104,7 @@ foreach ($mIds as $mId) {
             } else if ($status === 'STARTED' && strtotime($statusDateTime) + 30 * 60 < $currentTimestamp) {
 
             } else {
-                echo "Skipping-{$status}: Merchant {$mId} {$site} job: {$job[1]} with status: {$status} and status datetime: {$statusDateTime}\n";
+                $logger->info("Skipping job for merchant {$mId} site {$site} with status: {$status} and status datetime: {$statusDateTime}");
                 continue;
             }
         }
@@ -173,14 +176,14 @@ foreach ($mIds as $mId) {
 }
 
 if (!empty($batch)) {
-    echo "Processing Total batch size: " . count($batch) . "\n";
     foreach (array_chunk($batch, 50) as $chunk) {
         selfWalletNileApi('/api/curl/batch', $chunk);
         usleep(100000); // 100ms
     }
-    echo "Total batch processed: " . count($batch) . "\n";
 }
 
 $file = __FILE__;
-echo "Executed script: $file\n";
-echo "ExecTime:" . (microtime(true) - $startTime) . "s\n";
+$logger->info("Executed script: $file", [
+    'execTime' => number_format(microtime(true) - $startTime, 2) . 's',
+    'batchSize' => count($batch),
+]);

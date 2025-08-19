@@ -91,3 +91,37 @@ function getAppRoot(): string
 
     throw new \RuntimeException('App root not set. Please define $appRoot in your script.');
 }
+
+function postAndForget($url,$data = []) {
+    global $MERCHANT;
+    $tmp = [];
+    foreach ($data as $k => $v) {
+        $tmp[] = $k.'='.urlencode($v);
+    }
+    $parts = parse_url($url);
+    if (!empty($parts['query'])) {
+        $tmp[] = $parts['query'];
+    }
+    $post_string = implode('&',$tmp);
+    if ($parts['scheme'] === 'https') {
+        $context = stream_context_create(['ssl' => ['verify_peer' => false, 'verify_peer_name' => false]]);
+        $fp = stream_socket_client('ssl://'.$parts['host'].':443', $errno, $errstr, 5, STREAM_CLIENT_CONNECT, $context);
+    } else {
+        $fp = fsockopen($parts['host'], (empty($parts['port']) ? 80 : $parts['port']), $errno, $errstr, 5);
+    }
+    if (!$fp) {
+        return false;
+    } else {
+        $out = "POST ".$parts['path']." HTTP/1.1\r\n";
+        $out.= "Host: ".$parts['host']."\r\n";
+        $out.= "Content-Type: application/x-www-form-urlencoded\r\n";
+        $out.= "Content-Length: ".strlen($post_string)."\r\n";
+        $out.= "Connection: Close\r\n\r\n";
+        if (isset($post_string)) $out.= $post_string;
+        fwrite($fp, $out);
+        stream_set_timeout($fp, 0, 10000);
+        fread($fp, 1);
+        fclose($fp);
+        return true;
+    }
+}
