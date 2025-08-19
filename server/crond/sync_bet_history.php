@@ -8,25 +8,26 @@ require_once __DIR__ . '/../../src/bootstrap.php';
 
 use Carbon\Carbon;
 
+$currentTimestamp = strtotime('now');
 $merchantRp = new App\Repositories\MerchantRepo;
 $wrodb = $merchantRp->getDB();
 $redis = new App\Utils\RedisUtil();
+
 $jobs = [
     'JILI'  => [1, 'jili'],
     'JILI2' => [1, 'jili'],
     'JILI3' => [1, 'jili']
 ];
 $jobK = array_keys($jobs);
-$currentTimestamp = strtotime('now');
 $cron = [];
 $query = "SELECT * FROM cron_jobs WHERE  code IN ('" . implode("','", $jobK) . "')";
 $cJobs = $wrodb->query($query);
+
 foreach ($cJobs as $c) {
     $cron[$c['merchant_id']][$c['code']] = $c;
 }
 
 $mIds = $wrodb->queryFirstColumn("SELECT id FROM merchants WHERE status = 'ACTIVE'");
-
 $batch = [];
 foreach ($mIds as $mId) {
     $uniq = [];
@@ -124,7 +125,7 @@ foreach ($mIds as $mId) {
             $data['cronId'] = $merchantRp->createCJob([
                 'merchant_id'        => $mId,
                 'code'               => $site,
-                'status'          => 'PROCESSING',
+                'status'             => 'PROCESSING',
                 'execution_datetime' => Carbon::now(),
                 'status_datetime'    => Carbon::now(),
             ]);
@@ -144,13 +145,13 @@ foreach ($mIds as $mId) {
         if (!empty($job[1]) && empty($uniq[$job[1]])) {
             $uniq[$job[1]] = 1;
             $batch[] = [
-                "url" => getMerchantServerConfig($mId, 'APIURL'),
-                "cronId" => $data['cronId'],
-                "merchantId" => $mId,
-                "site" => $site,
-                "module" => $job[1],
-                "accessId" => (int) env('WALLET_SYSTEM_ADMIN_ACCESS_ID'),
-                "accessToken" => (string) env('WALLET_SYSTEM_ADMIN_TOKEN'),
+                "url"            => getMerchantServerConfig($mId, 'APIURL'),
+                "cronId"         => $data['cronId'],
+                "merchantId"     => $mId,
+                "site"           => $site,
+                "module"         => $job[1],
+                "accessId"       => (int)env('WALLET_SYSTEM_ADMIN_ACCESS_ID'),
+                "accessToken"    => (string)env('WALLET_SYSTEM_ADMIN_TOKEN'),
                 "nonTransaction" => 1
             ];
         }
@@ -158,13 +159,13 @@ foreach ($mIds as $mId) {
         if (!empty($job[2]) && empty($uniq[$job[2]])) {
             $uniq[$job[2]] = 1;
             $batch[] = [
-                "url" => getMerchantServerConfig($mId, 'APIURL'),
-                "cronId" => $data['cronId'],
-                "merchantId" => $mId,
-                "site" => $site,
-                "module" => $job[2],
-                "accessId" => (int) env('WALLET_SYSTEM_ADMIN_ACCESS_ID'),
-                "accessToken" => (string) env('WALLET_SYSTEM_ADMIN_TOKEN'),
+                "url"            => getMerchantServerConfig($mId, 'APIURL'),
+                "cronId"         => $data['cronId'],
+                "merchantId"     => $mId,
+                "site"           => $site,
+                "module"         => $job[2],
+                "accessId"       => (int)env('WALLET_SYSTEM_ADMIN_ACCESS_ID'),
+                "accessToken"    => (string)env('WALLET_SYSTEM_ADMIN_TOKEN'),
                 "nonTransaction" => 1
             ];
         }
