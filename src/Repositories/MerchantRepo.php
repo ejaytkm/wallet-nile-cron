@@ -24,4 +24,32 @@ final class MerchantRepo extends BaseRepository
             );
         }
     }
+
+    public function createCJob($params = []): false|string
+    {
+        if (empty($params)) {
+            return false;
+        }
+
+        $this->db->insert('cron_jobs', $params);
+        return $this->db->insertId();
+    }
+
+    /**
+     * @throws MeekroDBException
+     */
+    public function updateCJob($id, $params = []): bool
+    {
+        if (empty($params)) {
+            return false;
+        }
+
+        $d = $this->db->update('cron_jobs', $params, 'id=%i', $id);
+
+        if ($d === false) {
+            throw new \MeekroDBException("Failed to update cron job with ID: $id");
+        }
+
+        return $this->db->affectedRows() >= 0;
+    }
 }

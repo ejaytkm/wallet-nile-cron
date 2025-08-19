@@ -1,7 +1,3 @@
-# CRON
-init-cron:
-	@docker start app exec -it -e XDEBUG_MODE=off wallet-nile-cron /usr/local/bin/composer install
-
 # INSTALL
 start:
 	@cd environment && docker-compose up -d
@@ -28,19 +24,12 @@ app@restart:
 app@autoload:
 	@docker exec -it -e XDEBUG_MODE=off wallet-nile-cron /usr/local/bin/composer dump-autoload
 
-app@swole-version:
-	@docker exec -it wallet-nile-cron php -r "echo swoole_version();"
-	@printf "\nSwoole version displayed successfully."
-
 ## COMMANDS
 app@cron:
-	@docker exec -it wallet-nile-cron php cron.php
-
-app@cron-requeue:
-	@docker exec -it wallet-nile-cron php crond/requeue_jobs.php
+	@docker exec -it wallet-nile-cron php server/cron.php
 
 app@cron-syncbet:
-	@docker exec -it wallet-nile-cron php crond/sync_bet_history.php
+	@docker exec -it wallet-nile-cron php server/crond/sync_bet_history.php
 
 ## DOCKER
 docker@tail-logs:

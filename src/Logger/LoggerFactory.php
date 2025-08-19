@@ -16,7 +16,7 @@ final class LoggerFactory
      * @param string $name   Logger channel name.
      */
     public static function build(
-        string $name = LoggerNameEnum::WORKER_NAME,
+        string $name = LoggerNameEnum::DEFAULT_LOGGER_NAME,
         Level $level = Level::Debug
     ): LoggerInterface {
         $path = getAppRoot() . '/storage/logs/application.log';

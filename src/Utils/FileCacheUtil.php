@@ -5,7 +5,7 @@ namespace App\Utils;
 
 use Predis\Client;
 
-class CacheUtil
+class FileCacheUtil
 {
     private Client $client;
 

@@ -1,9 +1,8 @@
 {
-  "name": "swoole/high-concurrency-app",
-  "description": "High-performance Swoole application with 100k coroutines support",
+  "name": "Cron app",
+  "description": "Simple cron app",
   "require": {
     "php": "^8.3",
-    "ext-swoole": ">=5.0",
     "ext-pdo": "*",
     "ext-json": "*",
     "vlucas/phpdotenv": "^5.6",

@@ -10,60 +10,32 @@ function env(string $key, $default = null)
     return $_ENV[$key] ?? $default;
 }
 
-function selfWalletApi(array $payload): array
-{
-    if (empty($payload['merchantId'])) {
-        throw new \InvalidArgumentException('Merchant ID (mid) is required in the payload.');
-    }
-
-    $http = new GuzzleUtil(62, 32);
-    $url = getMerchantServerConfig($payload['merchantId'], 'APIURL');
-
-    $headers = [
-        'Content-Type' => 'application/x-www-form-urlencoded',
-        'Accept'       => 'application/json'
-    ];
-
-    return $http->execute('POST', $url, $headers, $payload);
-}
-
 function selfWalletNileApi($path, array $payload): array
 {
     $http = new GuzzleUtil();
-    $proxyUrl = getMerchantServerConfig($payload['merchantId'], 'APIURL');
-
     $headers = [
         'Content-Type' => 'application/json',
         'Accept'       => 'application/json'
     ];
-
     $proxyPayload = [
         'fire_and_forget' => true,
-        'url'             => $proxyUrl,
         'method'          => 'POST',
-        'headers'         => $headers,
+        'headers'         => [
+            'Content-Type' => 'application/x-www-form-urlencoded',
+            'Accept'       => 'application/json',
+        ],
         'payload'         => [
             ...$payload,
-            'accessId'    => (int) env('WALLET_SYSTEM_ADMIN_ACCESS_ID'),
-            'accessToken' => (string) env('WALLET_SYSTEM_ADMIN_TOKEN'),
         ]
     ];
+
+    if (!empty($payload['merchantId'])) {
+        $proxyUrl = getMerchantServerConfig($payload['merchantId'], 'APIURL');
+        $proxyPayload['url'] = $proxyUrl;
+    }
+
     $url = 'http://' .  env('WALLET_NILE_URL') . $path;
-
-    echo "Proxying request to: $url - MID: {$payload['merchantId']} - SITE : {$payload['site']}\n";
     return $http->execute('POST', $url, $headers, $proxyPayload);
-}
-
-function selfWorkerApi(string $path, array $payload): array
-{
-    $http = new GuzzleUtil();
-    $url = 'http://' . env('APP_WORKER_LB_URL', 'http://localhost:9501') . $path;
-    $headers = [
-        'Content-Type' => 'application/json',
-        'Accept'       => 'application/json'
-    ];
-
-    return $http->execute('POST', $url, $headers, $payload);
 }
 
 function getMerchantServerConfig($merchantId, $attr): string
@@ -84,7 +56,6 @@ function getMerchantServerConfig($merchantId, $attr): string
     ) {
         $apiEndpoint = env('WALLET_URL', 'server.wallet.xdev');
         $cronEndpoint = env('APP_WORKER_LB_URL', 'secure.wallet-nile-cron.xdev');
-        $serverIP = '';
     }
 
     if ($attr === 'APIDIR') {

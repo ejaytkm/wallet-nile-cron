@@ -42,9 +42,6 @@ final class JobRepo extends BaseRepository
         return $this->db->insertId();
     }
 
-    /**
-     * @throws MeekroDBException
-     */
     public function updateCJob($id, $params = []): bool
     {
         if (empty($params)) {

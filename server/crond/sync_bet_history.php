@@ -2,35 +2,32 @@
 declare(strict_types=1);
 
 $startTime = microtime(true);
-require_once __DIR__ . '/../vendor/autoload.php';
-require_once __DIR__ . '/../src/bootstrap.php';
 
-use App\Repositories\Enum\JobTypeEnum;
+require_once __DIR__ . '/../../vendor/autoload.php';
+require_once __DIR__ . '/../../src/bootstrap.php';
+
 use Carbon\Carbon;
 
 $merchantRp = new App\Repositories\MerchantRepo;
-$jobsRp = new App\Repositories\JobRepo();
 $wrodb = $merchantRp->getDB();
-$jobsdb = $jobsRp->getDB();
 $redis = new App\Utils\RedisUtil();
-$total_fired = 0;
 $jobs = [
-    'JILI'  => [5, 'jili'],
-    'JILI2' => [5, 'jili'],
-    'JILI3' => [5, 'jili']
+    'JILI'  => [1, 'jili'],
+    'JILI2' => [1, 'jili'],
+    'JILI3' => [1, 'jili']
 ];
-$jobKeys = array_keys($jobs);
-
+$jobK = array_keys($jobs);
 $currentTimestamp = strtotime('now');
 $cron = [];
-$cJobs = $jobsdb->query("SELECT * FROM cron_jobs WHERE type = %s AND code IN %ls", JobTypeEnum::JOB_SYNC_BET, $jobKeys);
-
+$query = "SELECT * FROM cron_jobs WHERE  code IN ('" . implode("','", $jobK) . "')";
+$cJobs = $wrodb->query($query);
 foreach ($cJobs as $c) {
     $cron[$c['merchant_id']][$c['code']] = $c;
 }
 
 $mIds = $wrodb->queryFirstColumn("SELECT id FROM merchants WHERE status = 'ACTIVE'");
 
+$batch = [];
 foreach ($mIds as $mId) {
     $uniq = [];
     $cacheKey = 'USEDSITE-' . $mId;
@@ -118,23 +115,19 @@ foreach ($mIds as $mId) {
             'cronId'         => $cron[$mId][$site]['id'] ?? null,
         ];
 
-        try {
-            if ($data['cronId']) {
-                $jobsRp->updateCJob($data['cronId'], [
-                    'status'          => 'PROCESSING',
-                    'status_datetime' => date('Y-m-d H:i:s')
-                ]);
-            } else {
-                $data['cronId'] = $jobsRp->createCJob([
-                    'type'               => JobTypeEnum::JOB_SYNC_BET,
-                    'status'          => 'PROCESSING',
-                    'merchant_id'        => $mId,
-                    'code'               => $site,
-                    'execution_datetime' => Carbon::now(),
-                ]);
-            }
-        } catch (Exception $e) {
-            echo "Error updating or creating cron job for {$mId} {$site}: " . $e->getMessage() . "\n";
+        if ($data['cronId']) {
+            $merchantRp->updateCJob($data['cronId'], [
+                'status'          => 'PROCESSING',
+                'status_datetime' => date('Y-m-d H:i:s')
+            ]);
+        } else {
+            $data['cronId'] = $merchantRp->createCJob([
+                'merchant_id'        => $mId,
+                'code'               => $site,
+                'status'          => 'PROCESSING',
+                'execution_datetime' => Carbon::now(),
+                'status_datetime'    => Carbon::now(),
+            ]);
         }
 
         if (!in_array($site, ['KISS918SHP', 'KISS918H5', 'KISS918H52'])) {
@@ -150,37 +143,43 @@ foreach ($mIds as $mId) {
 
         if (!empty($job[1]) && empty($uniq[$job[1]])) {
             $uniq[$job[1]] = 1;
-            try {
-                selfWalletNileApi('/api/curl', [
-                    "merchantId" => $mId,
-                    "site" => $site,
-                    "module" => $job[1],
-                    "cronId" => $data['cronId']
-                ]);
-                $total_fired++;
-            } catch (Exception $e) {
-                echo "Error firing job for {$mId} {$site} module {$job[1]}: " . $e->getMessage() . "\n";
-            }
+            $batch[] = [
+                "url" => getMerchantServerConfig($mId, 'APIURL'),
+                "cronId" => $data['cronId'],
+                "merchantId" => $mId,
+                "site" => $site,
+                "module" => $job[1],
+                "accessId" => (int) env('WALLET_SYSTEM_ADMIN_ACCESS_ID'),
+                "accessToken" => (string) env('WALLET_SYSTEM_ADMIN_TOKEN'),
+                "nonTransaction" => 1
+            ];
         }
 
         if (!empty($job[2]) && empty($uniq[$job[2]])) {
             $uniq[$job[2]] = 1;
-            try {
-                selfWalletNileApi('/api/curl', [
-                    "merchantId" => $mId,
-                    "site" => $site,
-                    "module" => $job[2],
-                    "cronId" => $data['cronId']
-                ]);
-                $total_fired++;
-            } catch (Exception $e) {
-                echo "Error firing job for {$mId} {$site} module {$job[2]}: " . $e->getMessage() . "\n";
-            }
+            $batch[] = [
+                "url" => getMerchantServerConfig($mId, 'APIURL'),
+                "cronId" => $data['cronId'],
+                "merchantId" => $mId,
+                "site" => $site,
+                "module" => $job[2],
+                "accessId" => (int) env('WALLET_SYSTEM_ADMIN_ACCESS_ID'),
+                "accessToken" => (string) env('WALLET_SYSTEM_ADMIN_TOKEN'),
+                "nonTransaction" => 1
+            ];
         }
     }
 }
 
+if (!empty($batch)) {
+    echo "Processing Total batch size: " . count($batch) . "\n";
+    foreach (array_chunk($batch, 50) as $chunk) {
+        selfWalletNileApi('/api/curl/batch', $chunk);
+        usleep(100000); // 100ms
+    }
+    echo "Total batch processed: " . count($batch) . "\n";
+}
+
 $file = __FILE__;
 echo "Executed script: $file\n";
-echo "TotalFired:" . $total_fired  .
-    "|ExecTime:" . (microtime(true) - $startTime) . "s\n";
+echo "ExecTime:" . (microtime(true) - $startTime) . "s\n";
