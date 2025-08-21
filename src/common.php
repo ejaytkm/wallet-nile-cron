@@ -1,10 +1,6 @@
 <?php
 
 use App\Utils\GuzzleUtil;
-
-if (!defined('SWOOLE_HOOK_ALL')) define('SWOOLE_HOOK_ALL', 0xFFFFFF);
-if (!defined('SWOOLE_HOOK_NATIVE_CURL')) define('SWOOLE_HOOK_NATIVE_CURL', 0x2000);
-
 function env(string $key, $default = null)
 {
     return $_ENV[$key] ?? $default;

@@ -1,11 +1,11 @@
 [Unit]
-Description=Swoole HTTP Worker Server (%i)
+Description=Cron Service
 After=network.target
 
 [Service]
 Type=simple
 WorkingDirectory=/var/app/current
-ExecStart=/usr/bin/php /var/app/current/server.php
+ExecStart=/usr/bin/php /var/app/current/server/cron.php
 Restart=on-failure
 RestartSec=5
 
