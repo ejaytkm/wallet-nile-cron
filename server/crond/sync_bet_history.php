@@ -5,11 +5,9 @@ require_once __DIR__ . '/../../vendor/autoload.php';
 require_once __DIR__ . '/../../src/bootstrap.php';
 
 use Carbon\Carbon;
-use Psr\Log\LoggerInterface;
 
 global $container;
-
-$logger = $container->get(LoggerInterface::class);
+$logger = $container->get(Psr\Log\LoggerInterface::class);
 $startTime = microtime(true);
 $currentTimestamp = strtotime('now');
 $merchantRp = new App\Repositories\MerchantRepo;
