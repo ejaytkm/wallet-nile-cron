@@ -89,7 +89,6 @@ function getAppRoot(): string
 }
 
 function postAndForget($url,$data = []) {
-    global $MERCHANT;
     $tmp = [];
     foreach ($data as $k => $v) {
         $tmp[] = $k.'='.urlencode($v);
@@ -101,9 +100,9 @@ function postAndForget($url,$data = []) {
     $post_string = implode('&',$tmp);
     if ($parts['scheme'] === 'https') {
         $context = stream_context_create(['ssl' => ['verify_peer' => false, 'verify_peer_name' => false]]);
-        $fp = stream_socket_client('ssl://'.$parts['host'].':443', $errno, $errstr, 5, STREAM_CLIENT_CONNECT, $context);
+        $fp = stream_socket_client('ssl://'.$parts['host'].':443', $errNo, $errStr, 5, STREAM_CLIENT_CONNECT, $context);
     } else {
-        $fp = fsockopen($parts['host'], (empty($parts['port']) ? 80 : $parts['port']), $errno, $errstr, 5);
+        $fp = fsockopen($parts['host'], (empty($parts['port']) ? 80 : $parts['port']), $errNo, $errStr, 5);
     }
     if (!$fp) {
         return false;

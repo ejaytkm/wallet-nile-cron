@@ -4,16 +4,22 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../vendor/autoload.php';
 require_once __DIR__ . '/../../src/bootstrap.php';
 
+use App\Repositories\Enum\JobTypeEnum;
 use Carbon\Carbon;
 
 global $container;
+
 $logger = $container->get(Psr\Log\LoggerInterface::class);
+$redis = new App\Utils\RedisUtil();
 $startTime = microtime(true);
 $currentTimestamp = strtotime('now');
-$merchantRp = new App\Repositories\MerchantRepo;
-$wrodb = $merchantRp->getDB();
-$redis = new App\Utils\RedisUtil();
 
+$merchantRp = new App\Repositories\MerchantRepo;
+$jobRp = new App\Repositories\JobRepo;
+$jobdb = $jobRp->getDB();
+$wrodb = $merchantRp->getDB();
+
+// @TODO:  Maybe this can be in the database instead and do left join with cronjobs
 $jobs = [
     'JILI'  => [5, 'jili'],
     'JILI2' => [5, 'jili'],
@@ -22,13 +28,17 @@ $jobs = [
 $jobK = array_keys($jobs);
 $cron = [];
 $query = "SELECT * FROM cron_jobs WHERE  code IN ('" . implode("','", $jobK) . "')";
-$cJobs = $wrodb->query($query);
+$cJobs = $jobdb->query($query);
 
 foreach ($cJobs as $c) {
     $cron[$c['merchant_id']][$c['code']] = $c;
 }
 
-$mIds = $wrodb->queryFirstColumn("SELECT id FROM merchants WHERE status = 'ACTIVE'");
+$sql = getenv('TEST_MERCHANT_IDS') ?
+    "SELECT id FROM merchants WHERE status = 'ACTIVE' AND id IN (" . getenv('TEST_MERCHANT_IDS') . ")" :
+    "SELECT id FROM merchants WHERE status = 'ACTIVE'";
+$mIds = $wrodb->queryFirstColumn($sql);
+
 $batch = [];
 foreach ($mIds as $mId) {
     $uniq = [];
@@ -118,13 +128,14 @@ foreach ($mIds as $mId) {
         ];
 
         if ($data['cronId']) {
-            $merchantRp->updateCJob($data['cronId'], [
+            $jobRp->updateCJob($data['cronId'], [
                 'status'          => 'PROCESSING',
                 'status_datetime' => date('Y-m-d H:i:s')
             ]);
         } else {
-            $data['cronId'] = $merchantRp->createCJob([
+            $data['cronId'] = $jobRp->createCJob([
                 'merchant_id'        => $mId,
+                'type'               => JobTypeEnum::JOB_SYNC_BET,
                 'code'               => $site,
                 'status'             => 'PROCESSING',
                 'execution_datetime' => Carbon::now(),
@@ -174,14 +185,13 @@ foreach ($mIds as $mId) {
 }
 
 if (!empty($batch)) {
-    foreach (array_chunk($batch, 50) as $chunk) {
-        selfWalletNileApi('/api/curl/batch', $chunk);
-        usleep(100000); // 100ms
-    }
+//    foreach (array_chunk($batch, 50) as $chunk) {
+//        selfWalletNileApi('/api/curl/batch', $chunk);
+//        usleep(100000); // 100ms
+//    }
 }
 
-$file = __FILE__;
-$logger->info("Executed script: $file", [
+$logger->info("Executed script: " .  __FILE__, [
     'execTime' => number_format(microtime(true) - $startTime, 2) . 's',
     'batchSize' => count($batch),
 ]);
