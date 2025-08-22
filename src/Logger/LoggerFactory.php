@@ -22,6 +22,9 @@ final class LoggerFactory
         $path = getAppRoot() . '/storage/logs/application.log';
         $logger = new Logger($name);
         $logger->pushHandler(new StreamHandler($path, $level));
+        if (env('APP_DEBUG')) {
+            $logger->pushHandler(new StreamHandler('php://stdout', $level));
+        }
         return $logger;
     }
 }
