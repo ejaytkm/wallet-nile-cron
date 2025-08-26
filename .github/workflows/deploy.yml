@@ -30,6 +30,7 @@ jobs:
           --exclude='node_modules' \
           --exclude='storage/logs/*' \
           --exclude='storage/cache/*' \
+          --exclude='deployment.tar.gz' \
           .
           
     - name: Copy files to EC2
