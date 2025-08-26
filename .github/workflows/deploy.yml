@@ -24,14 +24,15 @@ jobs:
       
     - name: Create deployment archive
       run: |
+        cd ..
         tar -czf deployment.tar.gz \
           --exclude='.git' \
           --exclude='.github' \
           --exclude='node_modules' \
           --exclude='storage/logs/*' \
           --exclude='storage/cache/*' \
-          --exclude='deployment.tar.gz' \
-          .
+          $(basename $GITHUB_WORKSPACE)
+        mv deployment.tar.gz $GITHUB_WORKSPACE/
           
     - name: Copy files to EC2
       uses: appleboy/scp-action@v0.1.7
