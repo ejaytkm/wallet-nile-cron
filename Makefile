@@ -29,7 +29,7 @@ app@cron:
 	@docker exec -it wallet-nile-cron php server/cron.php
 
 app@cron-syncbet:
-	@docker exec -it -e TEST_MERCHANT_IDS=760,90,10179 wallet-nile-cron php server/crond/syncBetHistory.php
+	@docker exec -it -e TEST_MERCHANT_IDS=760,10179 wallet-nile-cron php server/crond/syncBetHistory.php
 
 ## DOCKER
 docker@tail-logs:

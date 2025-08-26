@@ -33,8 +33,8 @@ foreach ($cJobs as $c) {
     $cron[$c['merchant_id']][$c['code']] = $c;
 }
 
-$sql = getenv('TEST_MERCHANT_IDS') ?
-    "SELECT id FROM merchants WHERE status = 'ACTIVE' AND id IN (" . getenv('TEST_MERCHANT_IDS') . ")" :
+$sql = env('TEST_MERCHANT_IDS') ?
+    "SELECT id FROM merchants WHERE status = 'ACTIVE' AND id IN (" . env('TEST_MERCHANT_IDS') . ")" :
     "SELECT id FROM merchants WHERE status = 'ACTIVE'";
 $mIds = $wrodb->queryFirstColumn($sql);
 
