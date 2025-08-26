@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+use App\Repositories\MerchantRepo;
+
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../src/bootstrap.php';
 
@@ -13,8 +15,12 @@ global $container;
 $logger = $container->get(Psr\Log\LoggerInterface::class);
 
 try {
-    postAndForget($self . '/crond/syncBetHistory.php');
-    $logger->info("Called syncBetHistory.php");
+    // SYNC_BET_HISTORY
+   $envs =  MerchantRepo::WALLET_ENVS;
+    foreach ($envs as $e) {
+        postAndForget($self . '/crond/syncBetHistory.php?wEnv=' . $e);
+    }
+    $logger->info("Called syncBetHistory.php" . json_encode($envs));
 } catch (Throwable $e) {
     $logger->error("Error at cron.php" . $e->getMessage(), [
         'message' => $e->getMessage(),

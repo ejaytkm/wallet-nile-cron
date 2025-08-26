@@ -88,7 +88,8 @@ function getAppRoot(): string
     throw new \RuntimeException('App root not set. Please define $appRoot in your script.');
 }
 
-function postAndForget($url,$data = []) {
+function postAndForget($url, $data = []): bool
+{
     $tmp = [];
     foreach ($data as $k => $v) {
         $tmp[] = $k.'='.urlencode($v);

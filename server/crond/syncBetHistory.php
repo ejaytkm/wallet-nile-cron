@@ -13,23 +13,33 @@ $logger = $container->get(Psr\Log\LoggerInterface::class);
 $redis = new App\Utils\RedisUtil();
 $startTime = microtime(true);
 $currentTimestamp = strtotime('now');
+$wallet_env = match (true) {
+    isset($_GET['wEnv']) && in_array($_GET['wEnv'], App\Repositories\MerchantRepo::WALLET_ENVS) => $_GET['wEnv'],
+    isset($_POST['wEnv']) && in_array($_POST['wEnv'], App\Repositories\MerchantRepo::WALLET_ENVS) => $_POST['wEnv'],
+    env('wEnv') !== null && in_array(env('wEnv'), App\Repositories\MerchantRepo::WALLET_ENVS) => env('wEnv'),
+    default => null
+};
 
-$merchantRp = new App\Repositories\MerchantRepo;
-$jobRp = new App\Repositories\JobRepo;
-$jobdb = $jobRp->getDB();
+if (empty($wallet_env)) {
+    $logger->error("Invalid wallet environment passed. Please see config at repo", ['wenv' => $_GET['wenv'] ?? null]);
+    exit;
+}
+
+$merchantRp = new App\Repositories\MerchantRepo($wallet_env);
+$globalRp = new App\Repositories\JobRepo();
+$glodb = $globalRp->getDB();
 $wrodb = $merchantRp->getDB();
 
-$jobs = [
-    'JILI'  => [5, 'jili'],
-    'JILI2' => [5, 'jili'],
-    'JILI3' => [5, 'jili']
-];
+$config = $globalRp->getJobsConfig(JobTypeEnum::JOB_SYNC_BET);
+$jobs = [];
+foreach ($config as $c) {
+    $jobs[$c['job_name']] = json_decode($c['json_config'], true);
+}
 $jobK = array_keys($jobs);
-$cron = [];
-$query = "SELECT * FROM cron_jobs WHERE code IN ('" . implode("','", $jobK) . "')";
-$cJobs = $jobdb->query($query);
+$query = "SELECT * FROM cron_jobs_v2 WHERE code IN ('" . implode("','", $jobK) . "')";
 
-foreach ($cJobs as $c) {
+$cron = [];
+foreach ($glodb->query($query) as $c) {
     $cron[$c['merchant_id']][$c['code']] = $c;
 }
 
@@ -39,6 +49,7 @@ $sql = env('TEST_MERCHANT_IDS') ?
 $mIds = $wrodb->queryFirstColumn($sql);
 
 $batch = [];
+$skipped = 0;
 foreach ($mIds as $mId) {
     $uniq = [];
     $activeSites = getActiveSites($mId);
@@ -56,7 +67,7 @@ foreach ($mIds as $mId) {
         $statusDateTime = $cron[$mId][$site]['status_datetime'] ?? '2021-01-01 00:00:00';
 
         if (shouldSkipJob($status, $statusDateTime, $job[0], $currentTimestamp)) {
-            $logger->info("Skipping job for merchant {$mId} site {$site} with status: {$status} and status datetime: {$statusDateTime} and interval: {$job[0]} minutes");
+            $skipped++;
             continue;
         }
 
@@ -67,17 +78,18 @@ foreach ($mIds as $mId) {
         ];
 
         if ($data['cronId']) {
-            $jobRp->updateCJob($data['cronId'], [
+            $globalRp->updateCJob($data['cronId'], [
                 'status'          => 'PROCESSING',
                 'execution_datetime' => Carbon::now(),
             ]);
         } else {
-            $data['cronId'] = $jobRp->createCJob([
-                'merchant_id'        => $mId,
+            $data['cronId'] = $globalRp->createCJob([
+                'env'                => $wallet_env,
                 'type'               => JobTypeEnum::JOB_SYNC_BET,
+                'merchant_id'        => $mId,
                 'code'               => $site,
-                'status'             => 'PROCESSING',
-                'execution_datetime' => Carbon::now()
+                'execution_datetime' => Carbon::now(),
+                'status'             => 'PROCESSING'
             ]);
         }
 
@@ -102,13 +114,16 @@ if (!empty($batch)) {
 
 $logger->info("Executed script: " . __FILE__, [
     'execTime' => number_format(microtime(true) - $startTime, 2) . 's',
-    'batchSize' => count($batch),
+    'env' => $wallet_env,
+    'jobsKey' => count($jobK),
+    'processed' => count($batch),
+    'skipped' => $skipped
 ]);
 
 function getActiveSites(int $merchantId): array {
-    global $redis, $wrodb;
+    global $redis, $wrodb, $wallet_env;
 
-    $cacheKey = 'A_SITE:' . $merchantId;
+    $cacheKey = $wallet_env . ':A_SITE:' . $merchantId;
     $sites = $redis->get($cacheKey);
 
     if (!is_array($sites)) {
@@ -169,9 +184,10 @@ function shouldSkipJob(string $status, string $statusDateTime, int $jobInterval,
         $status === 'PROCESSING' && strtotime($statusDateTime) + 10 * 60 < $currentTimestamp => false,
         $status === 'STARTED' && strtotime($statusDateTime) + 30 * 60 < $currentTimestamp => false,
         $status !== 'PENDING' => true,
-        default => strtotime($statusDateTime) + $jobInterval * 60 > $currentTimestamp,
+        default => strtotime($statusDateTime) + $jobInterval > $currentTimestamp,
     };
 }
+
 function createBatchItem(int $merchantId, string $site, int $cronId, string $module): array {
     // "payload" => $payload
     return [
