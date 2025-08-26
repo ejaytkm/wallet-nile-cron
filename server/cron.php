@@ -13,7 +13,7 @@ global $container;
 $logger = $container->get(Psr\Log\LoggerInterface::class);
 
 try {
-    postAndForget($self . '/crond/sync_bet_history.php');
+    postAndForget($self . '/crond/syncBetHistory.php');
 } catch (Throwable $e) {
     $logger->error("Error at cron.php" . $e->getMessage(), [
         'message' => $e->getMessage(),

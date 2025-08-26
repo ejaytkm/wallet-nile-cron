@@ -21,6 +21,7 @@ require_once __DIR__ . '/common.php';
 $container = ContainerFactory::build();
 $logger = LoggerFactory::build('wallet-nile-cron', Level::Info);
 $container->set(LoggerInterface::class, $logger);
+$container->set('logger', $logger);
 $app_dir = __DIR__ . '/../';
 
 echo "Bootstrap loaded in " . (microtime(true) - $startTime) . " seconds.\n";

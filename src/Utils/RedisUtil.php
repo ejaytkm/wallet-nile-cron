@@ -31,6 +31,8 @@ class RedisUtil
 
     public function get(string $key)
     {
+        $appPrefix = 'CRON:';
+        $key = $appPrefix . $key;
         $ret = $this->client->get($key);
         if (!empty($ret)) {
             $tmp = json_decode($ret,true);
@@ -43,6 +45,8 @@ class RedisUtil
 
     public function set(string $key, $value, int $ttl = 0): void
     {
+        $appPrefix = 'CRON:';
+        $key = $appPrefix . $key;
         if (!is_scalar($value)) {
             $value = json_encode($value);
         }
