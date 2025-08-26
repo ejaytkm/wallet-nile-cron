@@ -1,5 +1,4 @@
 {
-  "name": "Cron app",
   "description": "Simple cron app",
   "require": {
     "php": "^8.3",
