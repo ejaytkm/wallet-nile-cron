@@ -1,0 +1,126 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.3'
+        extensions: pdo, json, curl, sockets
+        
+    - name: Install Composer dependencies
+      run: composer install --no-dev --optimize-autoloader
+      
+    - name: Create deployment archive
+      run: |
+        tar -czf deployment.tar.gz \
+          --exclude='.git' \
+          --exclude='.github' \
+          --exclude='node_modules' \
+          --exclude='storage/logs/*' \
+          --exclude='storage/cache/*' \
+          .
+          
+    - name: Copy files to EC2
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USERNAME }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        source: "deployment.tar.gz"
+        target: "/tmp/"
+        
+    - name: Deploy on EC2
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USERNAME }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          # Stop services
+          sudo systemctl stop wallet-nile-cron || true
+          sudo systemctl stop nginx || true
+          sudo systemctl stop php8.3-fpm || true
+          
+          # Create app directory if it doesn't exist
+          sudo mkdir -p /var/www/html
+          
+          # Backup current deployment
+          sudo mv /var/www/html /var/www/html.backup.$(date +%s) || true
+          
+          # Extract new deployment
+          cd /tmp
+          tar -xzf deployment.tar.gz
+          sudo mv wallet-nile-cron /var/www/html
+          sudo chown -R www-data:www-data /var/www/html
+          
+          # Create required directories
+          sudo mkdir -p /var/www/html/storage/logs
+          sudo mkdir -p /var/www/html/storage/cache
+          sudo chown -R www-data:www-data /var/www/html/storage
+          
+          # Copy environment file
+          sudo cp /var/www/html/.env.production /var/www/html/.env || true
+          
+          # Configure nginx
+          sudo tee /etc/nginx/sites-available/wallet-nile-cron > /dev/null <<EOF
+          server {
+              listen 80;
+              server_name _;
+              root /var/www/html/server;
+              index index.php;
+
+              location / {
+                  try_files \$uri \$uri/ /index.php?\$query_string;
+              }
+
+              location ~ \.php$ {
+                  fastcgi_pass unix:/var/run/php/php8.3-fpm.sock;
+                  fastcgi_index index.php;
+                  include fastcgi_params;
+                  fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+              }
+
+              location ~ /\.ht {
+                  deny all;
+              }
+          }
+          EOF
+          
+          # Enable nginx site
+          sudo ln -sf /etc/nginx/sites-available/wallet-nile-cron /etc/nginx/sites-enabled/
+          sudo rm -f /etc/nginx/sites-enabled/default
+          
+          # Test nginx configuration
+          sudo nginx -t
+          
+          # Install/update systemd service
+          sudo cp /var/www/html/systemd/cron.service /etc/systemd/system/wallet-nile-cron.service
+          sudo systemctl daemon-reload
+          sudo systemctl enable wallet-nile-cron
+          sudo systemctl enable nginx
+          sudo systemctl enable php8.3-fpm
+          
+          # Start services
+          sudo systemctl start php8.3-fpm
+          sudo systemctl start nginx
+          sudo systemctl start wallet-nile-cron
+          
+          # Check service status
+          sudo systemctl status php8.3-fpm
+          sudo systemctl status nginx
+          sudo systemctl status wallet-nile-cron
+          
+          # Cleanup
+          rm -f /tmp/deployment.tar.gz
