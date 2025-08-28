@@ -17,7 +17,7 @@ $redis = new App\Utils\RedisUtil();
 $rStatus = $redis->getClient()->ping();
 
 $data = [
-    "status" => "OK",
+    "status" => "OK1",
     "merchant1" => $merchantRp_1->testConnection(),
     "merchant2" => $merchantRp_2->testConnection(),
     "global" => $globalRp->testConnection(),
