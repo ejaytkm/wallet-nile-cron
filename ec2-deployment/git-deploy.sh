@@ -19,11 +19,11 @@ log() {
 
 log "Starting git deployment of $GITHUB_REPO at commit $COMMIT_SHA"
 
-# Stop services
+# Stop services (don't fail if they don't exist yet)
 log "Stopping services..."
-sudo systemctl stop wallet-nile-cron || true
-sudo systemctl stop nginx || true
-sudo systemctl stop php8.3-fpm || true
+sudo systemctl stop wallet-nile-cron 2>/dev/null || log "wallet-nile-cron not running"
+sudo systemctl stop nginx 2>/dev/null || log "nginx not running" 
+sudo systemctl stop php8.3-fpm 2>/dev/null || log "php8.3-fpm not running"
 
 # Handle git repository
 if [ -d "$APP_DIR/.git" ]; then
@@ -50,15 +50,16 @@ else
     sudo git reset --hard $COMMIT_SHA
 fi
 
-# Create .env file from GitHub secrets
-log "Creating .env file..."
+# FIRST: Create .env file from GitHub secrets (BEFORE composer)
+log "Creating .env file from GitHub secrets..."
 if [ -n "$ENV_CONTENT_B64" ]; then
     echo "$ENV_CONTENT_B64" | base64 -d > $APP_DIR/.env
     sudo chown www-data:www-data $APP_DIR/.env
     sudo chmod 644 $APP_DIR/.env
-    log ".env file created from GitHub secrets"
+    log ".env file created successfully from GitHub secrets"
 else
-    log "WARNING: No .env content provided, using existing .env file"
+    log "ERROR: No .env content provided! Cannot proceed without environment variables."
+    exit 1
 fi
 
 # Set proper permissions before composer
@@ -122,13 +123,39 @@ sudo systemctl enable php8.3-fpm
 log "Starting services..."
 sudo systemctl start php8.3-fpm
 sudo systemctl start nginx
+
+# Test the PHP script manually first
+log "Testing PHP script manually..."
+cd $APP_DIR
+if php server/cron.php --test 2>&1 | tee -a "$LOG_FILE"; then
+    log "PHP script test successful"
+else
+    log "PHP script test failed, trying to start anyway..."
+fi
+
+# Start wallet-nile-cron service
+log "Starting wallet-nile-cron service..."
 sudo systemctl start wallet-nile-cron
 
-# Check service status
+# Check service status with detailed logging
 log "Checking service status..."
 sudo systemctl is-active php8.3-fpm || { log "ERROR: php8.3-fpm failed to start"; exit 1; }
 sudo systemctl is-active nginx || { log "ERROR: nginx failed to start"; exit 1; }
-sudo systemctl is-active wallet-nile-cron || { log "ERROR: wallet-nile-cron failed to start"; exit 1; }
+
+# Check wallet-nile-cron with more detail
+if sudo systemctl is-active wallet-nile-cron > /dev/null; then
+    log "wallet-nile-cron service started successfully"
+else
+    log "wallet-nile-cron service failed to start"
+    log "Service status:"
+    sudo systemctl status wallet-nile-cron --no-pager --lines=10 | tee -a "$LOG_FILE"
+    log "Recent logs:"
+    sudo journalctl -u wallet-nile-cron --no-pager --lines=10 | tee -a "$LOG_FILE"
+    
+    log "Attempting to run script manually for debugging:"
+    cd $APP_DIR && php server/cron.php 2>&1 | head -20 | tee -a "$LOG_FILE"
+    exit 1
+fi
 
 log "✅ Deployment completed successfully!"
 log "Deployed commit: $COMMIT_SHA"
