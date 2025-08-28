@@ -1,12 +1,13 @@
 #!/bin/bash
 
 # AWS SSM Git Deployment Script for wallet-nile-cron
-# Usage: /opt/deployment/git-deploy.sh <GITHUB_REPO> <COMMIT_SHA>
+# Usage: /opt/deployment/git-deploy.sh <GITHUB_REPO> <COMMIT_SHA> <ENV_CONTENT_B64>
 
 set -e  # Exit on any error
 
 GITHUB_REPO="$1"
 COMMIT_SHA="$2"
+ENV_CONTENT_B64="$3"
 LOG_FILE="/var/log/deployment.log"
 APP_DIR="/var/www/html"
 WEB_DIR="/var/www/html/server"
@@ -47,6 +48,17 @@ else
     cd $APP_DIR
     sudo git config --global --add safe.directory $APP_DIR
     sudo git reset --hard $COMMIT_SHA
+fi
+
+# Create .env file from GitHub secrets
+log "Creating .env file..."
+if [ -n "$ENV_CONTENT_B64" ]; then
+    echo "$ENV_CONTENT_B64" | base64 -d > $APP_DIR/.env
+    sudo chown www-data:www-data $APP_DIR/.env
+    sudo chmod 644 $APP_DIR/.env
+    log ".env file created from GitHub secrets"
+else
+    log "WARNING: No .env content provided, using existing .env file"
 fi
 
 # Set proper permissions before composer
