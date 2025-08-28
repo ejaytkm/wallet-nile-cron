@@ -8,7 +8,8 @@ set -e  # Exit on any error
 GITHUB_REPO="$1"
 COMMIT_SHA="$2"
 LOG_FILE="/var/log/deployment.log"
-APP_DIR="/var/www/html/server"
+APP_DIR="/var/www/html"
+WEB_DIR="/var/www/html/server"
 
 # Logging function
 log() {
@@ -27,6 +28,8 @@ sudo systemctl stop php8.3-fpm || true
 if [ -d "$APP_DIR/.git" ]; then
     log "Updating existing repository..."
     cd $APP_DIR
+    # Fix git ownership issue
+    sudo git config --global --add safe.directory $APP_DIR
     sudo git fetch origin
     sudo git reset --hard $COMMIT_SHA
     sudo git clean -fd
@@ -42,16 +45,19 @@ else
     # Clone repository
     sudo git clone https://github.com/${GITHUB_REPO}.git $APP_DIR
     cd $APP_DIR
+    sudo git config --global --add safe.directory $APP_DIR
     sudo git reset --hard $COMMIT_SHA
 fi
 
-# Install Composer dependencies
-log "Installing Composer dependencies..."
-sudo -u www-data composer install --no-dev --optimize-autoloader
-
-# Set proper permissions
+# Set proper permissions before composer
 log "Setting permissions..."
 sudo chown -R www-data:www-data $APP_DIR
+sudo chmod -R 755 $APP_DIR
+
+# Install Composer dependencies
+log "Installing Composer dependencies..."
+cd $APP_DIR
+sudo -u www-data composer install --no-dev --optimize-autoloader
 
 # Create required directories
 sudo mkdir -p $APP_DIR/storage/logs
@@ -64,7 +70,7 @@ sudo tee /etc/nginx/sites-available/wallet-nile-cron > /dev/null <<EOF
 server {
     listen 80;
     server_name _;
-    root /var/www/html/server;
+    root $WEB_DIR;
     index index.php;
 
     location / {
