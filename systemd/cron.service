@@ -4,8 +4,8 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/var/app/current
-ExecStart=/usr/bin/php /var/app/current/server/cron.php
+WorkingDirectory=/var/www/html
+ExecStart=/usr/bin/php /var/www/html/server/cron.php
 Restart=on-failure
 RestartSec=5
 

@@ -10,54 +10,6 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Setup PHP
-      uses: shivammathur/setup-php@v2
-      with:
-        php-version: '8.3'
-        extensions: pdo, json, curl, sockets
-        
-    - name: Install Composer dependencies
-      run: composer install --no-dev --optimize-autoloader
-      
-    - name: Create .env file
-      run: |
-        cat > .env << EOF
-        # Add your environment variables here as GitHub secrets
-        # DATABASE_URL=${{ secrets.DATABASE_URL }}
-        # API_KEY=${{ secrets.API_KEY }}
-        # REDIS_URL=${{ secrets.REDIS_URL }}
-        # Add more variables as needed
-        EOF
-      
-    - name: Create deployment archive
-      run: |
-        cd ..
-        tar -czf deployment.tar.gz \
-          --exclude='.git' \
-          --exclude='.github' \
-          --exclude='node_modules' \
-          --exclude='storage/logs/*' \
-          --exclude='storage/cache/*' \
-          $(basename $GITHUB_WORKSPACE)
-        mv deployment.tar.gz $GITHUB_WORKSPACE/
-          
-    - name: Upload to S3
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-east-1
-        
-    - name: Upload deployment to S3
-      run: |
-        TIMESTAMP=$(date +%s)
-        S3_PATH="s3://${{ secrets.S3_DEPLOYMENT_BUCKET }}/wallet-nile-cron-${TIMESTAMP}.tar.gz"
-        aws s3 cp deployment.tar.gz "$S3_PATH"
-        echo "wallet-nile-cron-${TIMESTAMP}.tar.gz" > deployment_filename.txt
-        
     - name: Deploy on EC2
       uses: appleboy/ssh-action@v1.0.3
       with:
@@ -70,25 +22,27 @@ jobs:
           sudo systemctl stop nginx || true
           sudo systemctl stop php8.3-fpm || true
           
-          # Create app directory if it doesn't exist
-          sudo mkdir -p /var/www/html
+          # Create app directory if it doesn't exist and clone repo
+          if [ ! -d "/var/www/html" ]; then
+            sudo git clone https://github.com/yourusername/wallet-nile-cron.git /var/www/html
+          else
+            cd /var/www/html
+            sudo git fetch origin
+            sudo git reset --hard origin/main
+            sudo git pull origin main
+          fi
           
-          # Backup current deployment
-          sudo mv /var/www/html /var/www/html.backup.$(date +%s) || true
-          
-          # Download and extract new deployment
-          cd /tmp
-          aws s3 cp s3://${{ secrets.S3_DEPLOYMENT_BUCKET }}/$(cat deployment_filename.txt) deployment.tar.gz
-          tar -xzf deployment.tar.gz
-          sudo mv wallet-nile-cron /var/www/html
+          # Set permissions
           sudo chown -R www-data:www-data /var/www/html
+          
+          # Install Composer dependencies
+          cd /var/www/html
+          sudo -u www-data composer install --no-dev --optimize-autoloader
           
           # Create required directories
           sudo mkdir -p /var/www/html/storage/logs
           sudo mkdir -p /var/www/html/storage/cache
           sudo chown -R www-data:www-data /var/www/html/storage
-          
-          # .env file is already included in the deployment archive
           
           # Configure nginx
           sudo tee /etc/nginx/sites-available/wallet-nile-cron > /dev/null <<EOF
@@ -138,6 +92,3 @@ jobs:
           sudo systemctl status php8.3-fpm
           sudo systemctl status nginx
           sudo systemctl status wallet-nile-cron
-          
-          # Cleanup
-          rm -f /tmp/deployment.tar.gz
