@@ -7,7 +7,7 @@ use Monolog\Level;
 use Psr\Log\LoggerInterface;
 
 $startTime = microtime(true);
-echo "Loading bootstrap...\n";
+//echo "Loading bootstrap...\n";
 
 // CONFIGS
 $dotenv = Dotenv::createImmutable(__DIR__ . '/../');
@@ -24,4 +24,4 @@ $container->set(LoggerInterface::class, $logger);
 $container->set('logger', $logger);
 $app_dir = __DIR__ . '/../';
 
-echo "Bootstrap loaded in " . (microtime(true) - $startTime) . " seconds.\n";
+//echo "Bootstrap loaded in " . (microtime(true) - $startTime) . " seconds.\n";
