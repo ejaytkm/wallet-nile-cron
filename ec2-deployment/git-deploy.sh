@@ -8,7 +8,7 @@ set -e  # Exit on any error
 GITHUB_REPO="$1"
 COMMIT_SHA="$2"
 LOG_FILE="/var/log/deployment.log"
-APP_DIR="/var/www/html"
+APP_DIR="/var/www/html/server"
 
 # Logging function
 log() {
