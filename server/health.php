@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+use Predis\Response\Status;
+
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../src/bootstrap.php';
 
@@ -11,7 +13,7 @@ $merchantRp_2 = new App\Repositories\MerchantRepo('WALLET_1');
 $globalRp = new App\Repositories\JobRepo();
 $redis = new App\Utils\RedisUtil();
 
-/** @var \Predis\Response\Status $status */
+/** @var Status $status */
 $rStatus = $redis->getClient()->ping();
 
 $data = [
