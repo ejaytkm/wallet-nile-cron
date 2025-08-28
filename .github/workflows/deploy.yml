@@ -22,6 +22,16 @@ jobs:
     - name: Install Composer dependencies
       run: composer install --no-dev --optimize-autoloader
       
+    - name: Create .env file
+      run: |
+        cat > .env << EOF
+        # Add your environment variables here as GitHub secrets
+        # DATABASE_URL=${{ secrets.DATABASE_URL }}
+        # API_KEY=${{ secrets.API_KEY }}
+        # REDIS_URL=${{ secrets.REDIS_URL }}
+        # Add more variables as needed
+        EOF
+      
     - name: Create deployment archive
       run: |
         cd ..
@@ -34,14 +44,19 @@ jobs:
           $(basename $GITHUB_WORKSPACE)
         mv deployment.tar.gz $GITHUB_WORKSPACE/
           
-    - name: Copy files to EC2
-      uses: appleboy/scp-action@v0.1.7
+    - name: Upload to S3
+      uses: aws-actions/configure-aws-credentials@v4
       with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ${{ secrets.EC2_USERNAME }}
-        key: ${{ secrets.EC2_SSH_KEY }}
-        source: "deployment.tar.gz"
-        target: "/tmp/"
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+        
+    - name: Upload deployment to S3
+      run: |
+        TIMESTAMP=$(date +%s)
+        S3_PATH="s3://${{ secrets.S3_DEPLOYMENT_BUCKET }}/wallet-nile-cron-${TIMESTAMP}.tar.gz"
+        aws s3 cp deployment.tar.gz "$S3_PATH"
+        echo "wallet-nile-cron-${TIMESTAMP}.tar.gz" > deployment_filename.txt
         
     - name: Deploy on EC2
       uses: appleboy/ssh-action@v1.0.3
@@ -61,8 +76,9 @@ jobs:
           # Backup current deployment
           sudo mv /var/www/html /var/www/html.backup.$(date +%s) || true
           
-          # Extract new deployment
+          # Download and extract new deployment
           cd /tmp
+          aws s3 cp s3://${{ secrets.S3_DEPLOYMENT_BUCKET }}/$(cat deployment_filename.txt) deployment.tar.gz
           tar -xzf deployment.tar.gz
           sudo mv wallet-nile-cron /var/www/html
           sudo chown -R www-data:www-data /var/www/html
@@ -72,8 +88,7 @@ jobs:
           sudo mkdir -p /var/www/html/storage/cache
           sudo chown -R www-data:www-data /var/www/html/storage
           
-          # Copy environment file
-          sudo cp /var/www/html/.env.production /var/www/html/.env || true
+          # .env file is already included in the deployment archive
           
           # Configure nginx
           sudo tee /etc/nginx/sites-available/wallet-nile-cron > /dev/null <<EOF
