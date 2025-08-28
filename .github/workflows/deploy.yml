@@ -10,34 +10,108 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.3'
+        extensions: pdo, json, curl, sockets
+        
+    - name: Install Composer dependencies
+      run: composer install --no-dev --optimize-autoloader
+      
+    - name: Create .env file
+      run: |
+        cat > .env << EOF
+        APP_ENV=${{ secrets.APP_ENV }}
+        APP_DEBUG=${{ secrets.APP_DEBUG }}
+        APP_WORKER_LB_URL=${{ secrets.APP_WORKER_LB_URL }}
+        
+        # Wallet
+        WALLET_NILE_URL=${{ secrets.WALLET_NILE_URL }}
+        WALLET_URL=${{ secrets.WALLET_URL }}
+        WALLET_SYSTEM_ADMIN_ACCESS_ID=${{ secrets.WALLET_SYSTEM_ADMIN_ACCESS_ID }}
+        WALLET_SYSTEM_ADMIN_TOKEN=${{ secrets.WALLET_SYSTEM_ADMIN_TOKEN }}
+        
+        # WALLET GLOBAL
+        DB_GLOBAL_DSN=${{ secrets.DB_GLOBAL_DSN }}
+        DB_GLOBAL_USER=${{ secrets.DB_GLOBAL_USER }}
+        DB_GLOBAL_PASS=${{ secrets.DB_GLOBAL_PASS }}
+        
+        # WALLET_1
+        DB_WALLET_0_DSN=${{ secrets.DB_WALLET_0_DSN }}
+        DB_WALLET_0_USER=${{ secrets.DB_WALLET_0_USER }}
+        DB_WALLET_0_PASS=${{ secrets.DB_WALLET_0_PASS }}
+        
+        # WALLET_2
+        DB_WALLET_1_DSN=${{ secrets.DB_WALLET_1_DSN }}
+        DB_WALLET_1_USER=${{ secrets.DB_WALLET_1_USER }}
+        DB_WALLET_1_PASS=${{ secrets.DB_WALLET_1_PASS }}
+        
+        # REDIS
+        REDIS_HOST=${{ secrets.REDIS_HOST }}
+        REDIS_PORT=${{ secrets.REDIS_PORT }}
+        REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+        REDIS_DB=${{ secrets.REDIS_DB }}
+        EOF
+      
+    - name: Create deployment archive
+      run: |
+        cd ..
+        tar -czf deployment.tar.gz \
+          --exclude='.git' \
+          --exclude='.github' \
+          --exclude='node_modules' \
+          --exclude='storage/logs/*' \
+          --exclude='storage/cache/*' \
+          $(basename $GITHUB_WORKSPACE)
+        mv deployment.tar.gz $GITHUB_WORKSPACE/
+          
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+        
+    - name: Upload deployment to S3
+      run: |
+        TIMESTAMP=$(date +%s)
+        DEPLOYMENT_FILE="wallet-nile-cron-${TIMESTAMP}.tar.gz"
+        S3_PATH="s3://${{ secrets.S3_DEPLOYMENT_BUCKET }}/${DEPLOYMENT_FILE}"
+        aws s3 cp deployment.tar.gz "$S3_PATH"
+        echo "DEPLOYMENT_FILE=${DEPLOYMENT_FILE}" >> $GITHUB_ENV
+        
     - name: Deploy on EC2
       uses: appleboy/ssh-action@v1.0.3
+      env:
+        DEPLOYMENT_FILE: ${{ env.DEPLOYMENT_FILE }}
+        S3_BUCKET: ${{ secrets.S3_DEPLOYMENT_BUCKET }}
       with:
         host: ${{ secrets.EC2_HOST }}
         username: ${{ secrets.EC2_USERNAME }}
         key: ${{ secrets.EC2_SSH_KEY }}
+        envs: DEPLOYMENT_FILE,S3_BUCKET
         script: |
           # Stop services
           sudo systemctl stop wallet-nile-cron || true
           sudo systemctl stop nginx || true
           sudo systemctl stop php8.3-fpm || true
           
-          # Create app directory if it doesn't exist and clone repo
-          if [ ! -d "/var/www/html" ]; then
-            sudo git clone https://github.com/yourusername/wallet-nile-cron.git /var/www/html
-          else
-            cd /var/www/html
-            sudo git fetch origin
-            sudo git reset --hard origin/main
-            sudo git pull origin main
-          fi
+          # Create app directory if it doesn't exist
+          sudo mkdir -p /var/www/html
           
-          # Set permissions
+          # Backup current deployment
+          sudo mv /var/www/html /var/www/html.backup.$(date +%s) || true
+          
+          # Download and extract new deployment
+          cd /tmp
+          aws s3 cp s3://${S3_BUCKET}/${DEPLOYMENT_FILE} deployment.tar.gz
+          tar -xzf deployment.tar.gz
+          sudo mv wallet-nile-cron /var/www/html
           sudo chown -R www-data:www-data /var/www/html
-          
-          # Install Composer dependencies
-          cd /var/www/html
-          sudo -u www-data composer install --no-dev --optimize-autoloader
           
           # Create required directories
           sudo mkdir -p /var/www/html/storage/logs
@@ -92,3 +166,6 @@ jobs:
           sudo systemctl status php8.3-fpm
           sudo systemctl status nginx
           sudo systemctl status wallet-nile-cron
+          
+          # Cleanup
+          rm -f /tmp/deployment.tar.gz
