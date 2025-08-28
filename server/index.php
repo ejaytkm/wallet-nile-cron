@@ -1,3 +1,3 @@
 <?php
 
-echo 'Wallet Nile Cron';
+echo 'Wallet Nile Cron Test';
