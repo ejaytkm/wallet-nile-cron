@@ -107,7 +107,7 @@ foreach ($mIds as $mId) {
 
 if (!empty($batch)) {
     foreach (array_chunk($batch, 50) as $chunk) {
-        selfWalletNileApi('/api/curl/sync-bet-batch', $chunk);
+//        selfWalletNileApi('/api/curl/sync-bet-batch', $chunk);
         usleep(100000); // 100ms
     }
 }
