@@ -16,8 +16,8 @@ $rStatus = $redis->getClient()->ping();
 
 $data = [
     "status" => "OK",
-    "merchant_1" => $merchantRp_1->testConnection(),
-    "merchant_2" => $merchantRp_2->testConnection(),
+    "merchant1" => $merchantRp_1->testConnection(),
+    "merchant2" => $merchantRp_2->testConnection(),
     "global" => $globalRp->testConnection(),
     "redis" => $rStatus->getPayload() === 'PONG' ? 'OK' : 'FAIL',
 ];
