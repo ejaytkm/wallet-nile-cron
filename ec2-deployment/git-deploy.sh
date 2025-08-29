@@ -57,8 +57,9 @@ if [ -n "$ENV_CONTENT_B64" ]; then
     sudo mkdir -p $APP_DIR
     sudo chown www-data:www-data $APP_DIR
     
-    # Create .env file with proper permissions
-    echo "$ENV_CONTENT_B64" | base64 -d | sudo -u www-data tee $APP_DIR/.env > /dev/null
+    # Create .env file with proper permissions (as root, then fix ownership)
+    echo "$ENV_CONTENT_B64" | base64 -d > $APP_DIR/.env
+    sudo chown www-data:www-data $APP_DIR/.env
     sudo chmod 644 $APP_DIR/.env
     
     log ".env file created successfully from GitHub secrets"
