@@ -16,11 +16,24 @@ $redis = new App\Utils\RedisUtil();
 /** @var Status $status */
 $rStatus = $redis->getClient()->ping();
 
+try {
+    $connection_1 = $merchantRp_1->testConnection();
+    $connection_2 = $merchantRp_2->testConnection();
+    $connection_global = $globalRp->testConnection();
+} catch (Throwable $e) {
+    http_response_code(500);
+    echo json_encode([
+        "status" => "FAIL",
+        "error" => $e->getMessage(),
+    ]);
+    exit;
+}
+
 $data = [
     "status" => "OK",
-    "merchant1" => $merchantRp_1->testConnection(),
-    "merchant2" => $merchantRp_2->testConnection(),
-    "global" => $globalRp->testConnection(),
+    "merchant1" => $connection_1,
+    "merchant2" => $connection_2,
+    "global" => $connection_global,
     "redis" => $rStatus->getPayload() === 'PONG' ? 'OK' : 'FAIL',
 ];
 
