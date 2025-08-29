@@ -21,7 +21,7 @@ $wallet_env = match (true) {
 };
 
 if (empty($wallet_env)) {
-    $logger->error("Invalid wallet environment passed. Please see config at repo", ['wenv' => $_GET['wenv'] ?? null]);
+    $logger->error("Invalid wallet environment passed. Please see config at repo", ['wEnv' => $_GET['wEnv'] ?? null]);
     exit;
 }
 
@@ -30,10 +30,15 @@ $globalRp = new App\Repositories\JobRepo();
 $glodb = $globalRp->getDB();
 $wrodb = $merchantRp->getDB();
 
-$config = $globalRp->getJobsConfig(JobTypeEnum::JOB_SYNC_BET);
+$config = $globalRp->getJobConfigActive(JobTypeEnum::JOB_SYNC_BET);
+if (empty($config)) {
+    $logger->info("No active job config found. Exiting script");
+    exit;
+}
+
 $jobs = [];
 foreach ($config as $c) {
-    $jobs[$c['job_name']] = json_decode($c['json_config'], true);
+    $jobs[$c['name']] = json_decode($c['json_config'], true);
 }
 $jobK = array_keys($jobs);
 $query = "SELECT * FROM cron_jobs_v2 WHERE code IN ('" . implode("','", $jobK) . "')";
@@ -57,30 +62,28 @@ foreach ($mIds as $mId) {
     foreach ($activeSites as $site) {
         $site = resolveSiteKey($site);
         $key = resolveJobKey($site);
+        $job = $cron[$mId][$site] ?? null;
+        $jobC = $jobs[$key] ?? null;
 
         if (empty($jobs[$key])) {
             continue;
         }
 
-        $job = $jobs[$key];
-        $status = $cron[$mId][$site]['status'] ?? 'PENDING';
-        $statusDateTime = $cron[$mId][$site]['status_datetime'] ?? '2021-01-01 00:00:00';
-
-        if (shouldSkipJob($status, $statusDateTime, $job[0], $currentTimestamp)) {
+        if (shouldSkipJob($job, $jobC)) {
             $skipped++;
             continue;
         }
 
         $data = [
-            'nonTransaction' => 1,
             'site'           => $site,
-            'cronId'         => $cron[$mId][$site]['id'] ?? null,
+            'nonTransaction' => 1,
         ];
 
-        if ($data['cronId']) {
+        if (isset($job['id'])) {
+            $data['cronId'] = $job['id'];
             $globalRp->updateCJob($data['cronId'], [
-                'status'          => 'PROCESSING',
                 'execution_datetime' => Carbon::now(),
+                'status'             => 'PROCESSING'
             ]);
         } else {
             $data['cronId'] = $globalRp->createCJob([
@@ -93,34 +96,38 @@ foreach ($mIds as $mId) {
             ]);
         }
 
-        if (!empty($job[1]) && empty($uniq[$job[1]])) {
-            $uniq[$job[1]] = 1;
-            $batch[] = createBatchItem($mId, $site, (int) $data['cronId'], '/betHistory/' . $job[1]);
-        }
-
-        if (!empty($job[2]) && empty($uniq[$job[2]])) {
-            $uniq[$job[2]] = 1;
-            $batch[] = createBatchItem($mId, $site, (int) $data['cronId'], '/betHistory/' . $job[2]);
+        $modules = $jobC['module'] ?? [];
+        foreach ($modules as $modName) {
+            if (!empty($modName) && empty($uniq[$modName])) {
+                $uniq[$modName] = 1;
+                $batch[] = createBatchItem(
+                    $mId,
+                    $site,
+                    (int)$data['cronId'],
+                    '/betHistory/' . $modName
+                );
+            }
         }
     }
 }
 
 if (!empty($batch)) {
     foreach (array_chunk($batch, 50) as $chunk) {
-//        selfWalletNileApi('/api/curl/sync-bet-batch', $chunk);
+        selfWalletNileApi('/api/curl/sync-bet-batch', $chunk, $wallet_env);
         usleep(100000); // 100ms
     }
 }
 
-$logger->info("Executed script: " . __FILE__, [
+$logger->info("Executed script: " . __FILE__, ['summary' => [
     'execTime' => number_format(microtime(true) - $startTime, 2) . 's',
-    'env' => $wallet_env,
-    'jobsKey' => count($jobK),
-    'processed' => count($batch),
-    'skipped' => $skipped
-]);
+    'env'      => $wallet_env,
+    'config'   => $jobK,
+    'fired'    => count($batch),
+    'skipped'  => $skipped
+]]);
 
-function getActiveSites(int $merchantId): array {
+function getActiveSites(int $merchantId): array
+{
     global $redis, $wrodb, $wallet_env;
 
     $cacheKey = $wallet_env . ':A_SITE:' . $merchantId;
@@ -155,7 +162,8 @@ function getActiveSites(int $merchantId): array {
     return $sites;
 }
 
-function resolveSiteKey(string $site): string {
+function resolveSiteKey(string $site): string
+{
     $siteMappings = ['MDBO', 'GMS', 'ETG', 'AVGX', 'SMART', 'ATLAS', 'GPK'];
 
     foreach ($siteMappings as $mapping) {
@@ -167,7 +175,8 @@ function resolveSiteKey(string $site): string {
     return $site;
 }
 
-function resolveJobKey(string $site): string {
+function resolveJobKey(string $site): string
+{
     $jobMappings = ['AWC', 'MEGA', 'PUSSY', 'KISS918', 'ABS', 'JOKER', 'YGG', 'DCT', 'KLNS'];
 
     foreach ($jobMappings as $mapping) {
@@ -179,17 +188,28 @@ function resolveJobKey(string $site): string {
     return $site;
 }
 
-function shouldSkipJob(string $status, string $statusDateTime, int $jobInterval, int $currentTimestamp): bool {
+function shouldSkipJob($job, $jobC): bool
+{
+    global $currentTimestamp;
+
+    $status = $job['status'] ?? '';
+    $statusDateTime = $job['status_datetime'] ?? '';
+    $executionDateTime = $job['execution_datetime'] ?? '';
+    $jobInterval = $jobC['interval'] ?? 60; // 60seconds default interval
+
+    if (empty($statusDateTime)) {
+        return strtotime($executionDateTime) + $jobInterval > $currentTimestamp;
+    }
+
     return match (true) {
-        $status === 'PROCESSING' && strtotime($statusDateTime) + 10 * 60 < $currentTimestamp => false,
-        $status === 'STARTED' && strtotime($statusDateTime) + 30 * 60 < $currentTimestamp => false,
-        $status !== 'PENDING' => true,
+        $status === 'PROCESSING' && strtotime($statusDateTime) + ($jobInterval * 2) < $currentTimestamp => false, // 10 minutes
+        $status !== 'PENDING' => true, // always skip if not PENDING
         default => strtotime($statusDateTime) + $jobInterval > $currentTimestamp,
     };
 }
 
-function createBatchItem(int $merchantId, string $site, int $cronId, string $module): array {
-    // "payload" => $payload
+function createBatchItem(int $merchantId, string $site, int $cronId, string $module): array
+{
     return [
         "url"            => getMerchantServerConfig($merchantId, 'APIURL'),
         "cronId"         => $cronId,

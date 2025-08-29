@@ -22,8 +22,15 @@ final class LoggerFactory
         $path = getAppRoot() . '/storage/logs/application.log';
         $logger = new Logger($name);
         $logger->pushHandler(new StreamHandler($path, $level));
+
         if (env('APP_DEBUG')) {
             $logger->pushHandler(new StreamHandler('php://stdout', $level));
+
+            if (php_sapi_name() !== 'cli' && isset($_SERVER['HTTP_USER_AGENT'])) {
+                // echo errors to browser for easier debugging
+                header('Content-Type: application/json');
+                $logger->pushHandler(new StreamHandler('php://output', $level));
+            }
         }
         return $logger;
     }

@@ -14,7 +14,8 @@
     "monolog/monolog": "^3.9",
     "ext-sockets": "*",
     "sergeytsalkov/meekrodb": "^3.1",
-    "predis/predis": "^3.2"
+    "predis/predis": "^3.2",
+    "ext-zlib": "*"
   },
   "autoload": {
     "psr-4": {

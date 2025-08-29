@@ -25,9 +25,9 @@ final class JobRepo extends BaseRepository
         }
     }
 
-    public function getJobsConfig($type): array
+    public function getJobConfigActive($type): array
     {
-        $jobs = $this->db->query("SELECT job_name, json_config FROM jobs_config WHERE type=%s AND enabled = 1", $type);
+        $jobs = $this->db->query("SELECT name, json_config FROM cron_jobs_config WHERE type=%s AND enabled = 1", $type);
         return $jobs ?: [];
     }
 

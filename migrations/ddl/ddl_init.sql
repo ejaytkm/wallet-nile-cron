@@ -1,22 +1,17 @@
 USE wallet_global;
 
-DROP TABLE IF EXISTS jobs_config;
-CREATE TABLE jobs_config (
+# DROP TABLE IF EXISTS cron_jobs_config;
+CREATE TABLE cron_jobs_config (
      id INT AUTO_INCREMENT PRIMARY KEY,
-     type              VARCHAR(50)                   not null,
-     job_name VARCHAR(50) NOT NULL UNIQUE,
+     type VARCHAR(50) not null,
+     name VARCHAR(50) NOT NULL UNIQUE,
      json_config JSON DEFAULT NULL,
     enabled BOOLEAN DEFAULT FALSE,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
+CREATE INDEX idx_cron_jobs_config_type_name ON cron_jobs_config (type, name);
 
-SET @JSON_CONFIG = '[300, "jili"]';
-INSERT INTO jobs_config (type, job_name, json_config, enabled) VALUES
-     ('SYNC_BET_HISTORY','JILI', @JSON_CONFIG, false),
-     ('SYNC_BET_HISTORY','JILI2', @JSON_CONFIG, false),
-     ('SYNC_BET_HISTORY', 'JILI3', @JSON_CONFIG, false);
-
-DROP TABLE IF EXISTS cron_jobs_v2;
+# DROP TABLE IF EXISTS cron_jobs_v2;
 CREATE TABLE cron_jobs_v2
 (
     id                 int auto_increment primary key,

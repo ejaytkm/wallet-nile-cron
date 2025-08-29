@@ -6,7 +6,7 @@ function env(string $key, $default = null)
     return $_ENV[$key] ?? $default;
 }
 
-function selfWalletNileApi($path, array $payload): array
+function selfWalletNileApi($path, array $payload, $walletEnv = null): array
 {
     $http = new GuzzleUtil();
     $headers = [
@@ -14,6 +14,7 @@ function selfWalletNileApi($path, array $payload): array
         'Accept'       => 'application/json'
     ];
     $proxyPayload = [
+        'walletEnv'      => $walletEnv,
         'fire_and_forget' => true,
         'method'          => 'POST',
         'headers'         => [
@@ -46,10 +47,7 @@ function getMerchantServerConfig($merchantId, $attr): string
         $serverIP = '54.169.192.26';
     }
 
-    if (
-        env('APP_ENV') != 'production' ||
-        env('APP_ENV') != 'prod'
-    ) {
+    if (!in_array(strtolower(env('APP_ENV')), ['production', 'prod'])) {
         $apiEndpoint = env('WALLET_URL', 'server.wallet.xdev');
         $cronEndpoint = env('APP_WORKER_LB_URL', 'secure.wallet-nile-cron.xdev');
     }
