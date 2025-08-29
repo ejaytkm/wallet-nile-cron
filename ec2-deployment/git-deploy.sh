@@ -53,12 +53,21 @@ fi
 # FIRST: Create .env file from GitHub secrets (BEFORE composer)
 log "Creating .env file from GitHub secrets..."
 if [ -n "$ENV_CONTENT_B64" ]; then
-    echo "$ENV_CONTENT_B64" | base64 -d > $APP_DIR/.env
-    sudo chown www-data:www-data $APP_DIR/.env
+    # Ensure directory exists and has correct permissions
+    sudo mkdir -p $APP_DIR
+    sudo chown www-data:www-data $APP_DIR
+    
+    # Create .env file with proper permissions
+    echo "$ENV_CONTENT_B64" | base64 -d | sudo -u www-data tee $APP_DIR/.env > /dev/null
     sudo chmod 644 $APP_DIR/.env
+    
     log ".env file created successfully from GitHub secrets"
+    log "Location: $APP_DIR/.env"
+    log "Owner: $(ls -la $APP_DIR/.env | awk '{print $3":"$4}')"
+    log "Permissions: $(ls -la $APP_DIR/.env | awk '{print $1}')"
 else
     log "ERROR: No .env content provided! Cannot proceed without environment variables."
+    log "ENV_CONTENT_B64 variable is empty or not set"
     exit 1
 fi
 
