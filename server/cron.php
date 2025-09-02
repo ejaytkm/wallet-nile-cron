@@ -6,9 +6,6 @@ use App\Repositories\MerchantRepo;
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../src/bootstrap.php';
 
-$minute = Carbon\Carbon::now()->minute;
-$apiDir = getMerchantServerConfig(0,'APIDIR');
-$cronDir = getMerchantServerConfig(0,'CRONDIR');
 $self = "http://" . env('APP_URL');
 
 global $container;

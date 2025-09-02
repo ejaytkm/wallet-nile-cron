@@ -212,7 +212,7 @@ function shouldSkipJob($job, $jobC): bool
 function createBatchItem(int $merchantId, string $site, int $cronId, string $module): array
 {
     return [
-        "url"            => getMerchantServerConfig($merchantId, 'APIURL'),
+        "url"            => getMerchantServerConfig($merchantId, 'CRONURL'),
         "cronId"         => $cronId,
         "merchantId"     => $merchantId,
         "site"           => $site,

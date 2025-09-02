@@ -26,11 +26,6 @@ function selfWalletNileApi($path, array $payload, $walletEnv = null): array
         ]
     ];
 
-    if (!empty($payload['merchantId'])) {
-        $proxyUrl = getMerchantServerConfig($payload['merchantId'], 'APIURL');
-        $proxyPayload['url'] = $proxyUrl;
-    }
-
     $url = 'http://' .  env('WALLET_NILE_URL') . $path;
     return $http->execute('POST', $url, $headers, $proxyPayload);
 }
@@ -49,7 +44,7 @@ function getMerchantServerConfig($merchantId, $attr): string
 
     if (!in_array(strtolower(env('APP_ENV')), ['production', 'prod'])) {
         $apiEndpoint = env('WALLET_URL', 'server.wallet.xdev');
-        $cronEndpoint = env('APP_WORKER_LB_URL', 'secure.wallet-nile-cron.xdev');
+        $cronEndpoint = env('WALLET_URL', 'server.wallet.xdev');
     }
 
     if ($attr === 'APIDIR') {
