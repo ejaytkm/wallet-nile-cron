@@ -14,4 +14,8 @@ Required environment variables:
 - wEnv={see-merchantRepo.php}
 
 ## Starting Crons
-See  git-deploy.sh
+Run command: 
+```
+sudo bash /var/www/html/environment/crond/init_cron.sh 
+```
+
