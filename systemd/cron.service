@@ -6,7 +6,7 @@ After=network.target
 Type=simple
 WorkingDirectory=/var/www/html
 ExecStart=/usr/bin/php /var/www/html/server/cron.php
-Restart=on-failure
+Restart=always
 RestartSec=5
 
 [Install]
