@@ -21,7 +21,7 @@ try {
         postAndForget($self . '/crond/syncBetHistory.php?wEnv=' . $e);
     }
     $now = Carbon\Carbon::now()->floorMinute()->format('H:i:s');
-    $logger->info("Called at $now syncBetHistory.php - " . json_encode($envs));
+    $logger->info("Cron run at $now syncBetHistory.php - " . json_encode($envs));
 } catch (Throwable $e) {
     $logger->error("Error at cron.php" . $e->getMessage(), [
         'message' => $e->getMessage(),
