@@ -32,7 +32,7 @@ $wrodb = $merchantRp->getDB();
 
 $config = $globalRp->getJobConfigActive(JobTypeEnum::JOB_SYNC_BET);
 if (empty($config)) {
-    $logger->info("No active job config found. Exiting script");
+    $logger->info("No active job config found for " . JobTypeEnum::JOB_SYNC_BET);
     exit;
 }
 
@@ -140,7 +140,7 @@ function getActiveSites(int $merchantId): array
             $merchantId
         );
         if (!empty($dbSites)) {
-            $since = date('Y-m-d H:i:s', strtotime('-2 hour'));
+            $since = date('Y-m-d H:i:s', strtotime('-1 hour'));
             $userSites = $wrodb->queryFirstColumn(
                 "SELECT DISTINCT site FROM user_site_transaction_log WHERE merchant_id = %i AND created_datetime > %s",
                 $merchantId,
@@ -153,10 +153,9 @@ function getActiveSites(int $merchantId): array
                 }
             }
         }
-        if (empty($sites)) {
-            $sites = $dbSites;
+        if (!empty($sites)) {
+            $redis->set($cacheKey, $sites, 300 + rand(0,5));
         }
-        $redis->set($cacheKey, $sites, 300);
     }
 
     return $sites;
