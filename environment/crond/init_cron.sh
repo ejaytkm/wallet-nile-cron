@@ -3,7 +3,7 @@
 cat >/etc/cron.d/clear_app_log <<'EOF'
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-*/5 * * * * www-data /usr/bin/truncate -s 0 /var/www/html/storage/logs/application.log
+0 */6 */5 * * www-data /usr/bin/truncate -s 0 /var/www/html/storage/logs/application.log
 EOF
 
 # Set the appropriate permissions and ownership for both cron jobs
