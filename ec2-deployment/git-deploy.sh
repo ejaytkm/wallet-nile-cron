@@ -137,7 +137,7 @@ sudo systemctl start nginx
 # Test the PHP script manually first
 log "Testing PHP script manually..."
 cd $APP_DIR
-if php server/cron.php --test 2>&1 | tee -a "$LOG_FILE"; then
+if php server/health.php --test 2>&1 | tee -a "$LOG_FILE"; then
     log "PHP script test successful"
 else
     log "PHP script test failed, trying to start anyway..."
@@ -163,7 +163,7 @@ else
     sudo journalctl -u wallet-nile-cron --no-pager --lines=10 | tee -a "$LOG_FILE"
     
     log "Attempting to run script manually for debugging:"
-    cd $APP_DIR && php server/cron.php 2>&1 | head -20 | tee -a "$LOG_FILE"
+    cd $APP_DIR && php server/health.php 2>&1 | head -20 | tee -a "$LOG_FILE"
     exit 1
 fi
 
