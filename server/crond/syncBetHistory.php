@@ -12,7 +12,7 @@ global $container;
 $logger = $container->get(Psr\Log\LoggerInterface::class);
 $redis = new App\Utils\RedisUtil();
 $startTime = microtime(true);
-$currentTimestamp = strtotime('now');
+$currentTimestamp = strtotime('now') - 1;
 $wallet_env = match (true) {
     isset($_GET['wEnv']) && in_array($_GET['wEnv'], App\Repositories\MerchantRepo::WALLET_ENVS) => $_GET['wEnv'],
     isset($_POST['wEnv']) && in_array($_POST['wEnv'], App\Repositories\MerchantRepo::WALLET_ENVS) => $_POST['wEnv'],
@@ -71,6 +71,10 @@ foreach ($mIds as $mId) {
 
         if (shouldSkipJob($job, $jobC)) {
             $skipped++;
+            $logger->info("Skipping job for $site of merchant $mId", [
+                'time' => $currentTimestamp,
+                'job' => $job,
+            ]);
             continue;
         }
 
