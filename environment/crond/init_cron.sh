@@ -21,4 +21,4 @@ chmod 644 /etc/cron.d/run_server_cron
 chown root:root /etc/cron.d/run_server_cron
 
 # Restart the cron service to apply changes
-systemctl restart crond
+systemctl restart cron
