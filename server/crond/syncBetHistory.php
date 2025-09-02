@@ -98,15 +98,17 @@ foreach ($mIds as $mId) {
 
         $modules = $jobC['module'] ?? [];
         foreach ($modules as $modName) {
-            if (!empty($modName) && empty($uniq[$modName])) {
-                $uniq[$modName] = 1;
-                $batch[] = createBatchItem(
-                    $mId,
-                    $site,
-                    (int)$data['cronId'],
-                    '/betHistory/' . $modName
-                );
+            if (isset($uniq[$site])) {
+                continue;
             }
+
+            $uniq[$site] = 1;
+            $batch[] = createBatchItem(
+                $mId,
+                $site,
+                (int)$data['cronId'],
+                '/betHistory/' . $modName
+            );
         }
     }
 }
