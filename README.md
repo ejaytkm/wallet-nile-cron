@@ -12,3 +12,6 @@ TEST_MERCHANT_IDS=21
 # syncBetHistory.php
 Required environment variables:
 - wEnv={see-merchantRepo.php}
+
+## Starting Crons
+See  git-deploy.sh
