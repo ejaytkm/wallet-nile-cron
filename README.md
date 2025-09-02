@@ -22,15 +22,15 @@ sudo bash /var/www/html/environment/crond/init_cron.sh
 ## LOGS 
 1. PHP-FPM Logs
    Error logs:
-   /var/log/php8.3-fpm.log
+   cat /var/log/php8.3-fpm.log
    If the log file is not there, check the PHP-FPM configuration file (e.g., /etc/php/8.3/fpm/php-fpm.conf or /etc/php/8.3/fpm/pool.d/www.conf) for the error_log directive.
 2. Nginx Logs
    Access logs:
-   /var/log/nginx/access.log
+   cat /var/log/nginx/access.log
    Error logs:
-   /var/log/nginx/error.log
+   cat /var/log/nginx/error.log
 3. Wallet-Nile-Cron Logs
    Deployment log (as defined in your script):
-   /var/log/deployment.log
+   cat /var/log/deployment.log
 4. Systemd service logs:
    sudo journalctl -u wallet-nile-cron
