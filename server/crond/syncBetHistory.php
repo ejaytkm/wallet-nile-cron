@@ -12,7 +12,7 @@ global $container;
 $logger = $container->get(Psr\Log\LoggerInterface::class);
 $redis = new App\Utils\RedisUtil();
 $startTime = microtime(true);
-$currentTimestamp = strtotime('now') - 1;
+$currentTimestamp = strtotime('now') + 1;
 $wallet_env = match (true) {
     isset($_GET['wEnv']) && in_array($_GET['wEnv'], App\Repositories\MerchantRepo::WALLET_ENVS) => $_GET['wEnv'],
     isset($_POST['wEnv']) && in_array($_POST['wEnv'], App\Repositories\MerchantRepo::WALLET_ENVS) => $_POST['wEnv'],
