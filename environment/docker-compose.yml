@@ -13,9 +13,9 @@ services:
     volumes:
       - ../:/var/app/current
     extra_hosts:
-      - "host.docker.internal:172.17.0.1" # Replace 172.17.0.1 with the IP you found
       - "server.wallet.xdev:172.17.0.1" # Replace 172.17.0.1 with the IP you found
       - "secure.wallet-nile-cron.xdev:172.17.0.1"
+      - "secure.wallet-nile-gate.xdev:172.17.0.1"
       - "secure.wallet-nile.xdev:172.17.0.1"
     working_dir: /var/app/current
 networks:
