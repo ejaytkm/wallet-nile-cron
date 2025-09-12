@@ -6,15 +6,20 @@ function env(string $key, $default = null)
     return $_ENV[$key] ?? $default;
 }
 
-function selfWalletNileApi($path, array $payload, $walletEnv = null): array
+function selfWalletNileApi(
+    $path,
+    array $payload,
+    $walletEnv = null,
+    $compression = false
+): array
 {
     $http = new GuzzleUtil();
     $headers = [
         'Content-Type' => 'application/json',
-        'Accept'       => 'application/json'
+        'Accept'       => 'application/json',
     ];
-    $proxyPayload = [
-        'walletEnv'      => $walletEnv,
+    $data = [
+        'walletEnv'      => $walletEnv, // don't delete this ~ logging. see gates
         'fire_and_forget' => true,
         'method'          => 'POST',
         'headers'         => [
@@ -26,8 +31,26 @@ function selfWalletNileApi($path, array $payload, $walletEnv = null): array
         ]
     ];
 
-    $url = 'http://' .  env('WALLET_NILE_URL') . $path;
-    return $http->execute('POST', $url, $headers, $proxyPayload);
+    if ($compression) {
+        $headers['Content-Encoding'] = 'gzip';
+        $data = ["content" => compressData($data)];
+    }
+
+    try {
+        return $http->execute(
+            'POST',
+            getNileUrl($path),
+            $headers,
+            $data
+        );
+    } catch (Throwable $e) {
+        return $http->execute(
+            'POST',
+            getNileUrl($path, 1),
+            $headers,
+            $data
+        );
+    }
 }
 
 function getMerchantServerConfig($merchantId, $attr): string
@@ -113,4 +136,25 @@ function postAndForget($url, $data = []): bool
         fclose($fp);
         return true;
     }
+}
+
+function compressData($data): string
+{
+    $lvl = 6;
+    $compressed = gzcompress(json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), $lvl);
+    return base64_encode($compressed);
+}
+
+function getNileUrl($path, $nileEnv = 0): string
+{
+    $baseUrl = 'http://' . env('WALLET_NILE_URL');
+
+    // Force on GATES
+    if (in_array(strtolower(env('APP_ENV')), ['production', 'prod'])) {
+        $baseUrl = $nileEnv === 0
+            ? 'http://wallet-nile-gate.eba-gcmxump7.ap-southeast-1.elasticbeanstalk.com'
+            : 'http://wallet-nile-gate-2.eba-gcmxump7.ap-southeast-1.elasticbeanstalk.com';
+    }
+
+    return $baseUrl . $path;
 }

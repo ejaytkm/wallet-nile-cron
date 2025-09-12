@@ -48,9 +48,9 @@ foreach ($glodb->query($query) as $c) {
     $cron[$c['merchant_id']][$c['code']] = $c;
 }
 
-$sql = env('TEST_MERCHANT_IDS') ?
-    "SELECT id FROM merchants WHERE status = 'ACTIVE' AND id IN (" . env('TEST_MERCHANT_IDS') . ")" :
-    "SELECT id FROM merchants WHERE status = 'ACTIVE'";
+//$sql = "SELECT id FROM merchants WHERE status = 'ACTIVE'"; // TODO DEV FUTURE: enable all merchants & delete bottom line
+//$sql = "SELECT id FROM merchants WHERE status = 'ACTIVE' AND (id BETWEEN 0 AND 71 OR id BETWEEN 1001 AND 1370);"; // TODO: DEV FUTURE after test
+$sql = "SELECT id FROM merchants WHERE status = 'ACTIVE' AND id IN (21,37,38,43,58,71,1370);";
 $mIds = $wrodb->queryFirstColumn($sql);
 
 $batch = [];
@@ -118,16 +118,24 @@ foreach ($mIds as $mId) {
 }
 
 if (!empty($batch)) {
-    foreach (array_chunk($batch, 50) as $chunk) {
-        selfWalletNileApi('/api/curl/sync-bet-batch', $chunk, $wallet_env);
+    foreach (array_chunk($batch, 50) as $index => $chunk) {
+        $res = selfWalletNileApi('/api/curl/sync-bet-batch', $chunk, $wallet_env, true);
+        $logger->info("Success Response Chunk:", [
+            'env'    => $wallet_env,
+            'iteration' => $index + 1,
+            'result' => $res['body'] ?? 'Cannot determine results'
+        ]);
         usleep(100000); // 100ms
     }
 }
 
-$logger->info("Executed script: " . __FILE__, ['summary' => [
-    'execTime' => number_format(microtime(true) - $startTime, 2) . 's',
+$logger->info("Completed SyncBet:", [
+    'summary' => [
+    'execTime' => number_format(microtime(true) - $startTime, 2),
     'env'      => $wallet_env,
+    'keys'     => 'sqs_cron_default:' . $wallet_env . ':{site}_{merchantId}',
     'config'   => $jobK,
+    'merchantCount'=> count($mIds),
     'fired'    => count($batch),
     'skipped'  => $skipped
 ]]);
@@ -200,17 +208,27 @@ function shouldSkipJob($job, $jobC): bool
     $status = $job['status'] ?? '';
     $statusDateTime = $job['status_datetime'] ?? '';
     $executionDateTime = $job['execution_datetime'] ?? '';
-    $jobInterval = $jobC['interval'] ?? 60; // 60seconds default interval
+    $jobInterval = (int) $jobC['interval'] ?? 60; // 60seconds default interval
 
     if (empty($statusDateTime)) {
         return strtotime($executionDateTime) + $jobInterval > $currentTimestamp;
     }
 
-    return match (true) {
-        $status === 'PROCESSING' && strtotime($statusDateTime) + ($jobInterval * 2) < $currentTimestamp => false, // 10 minutes
-        $status !== 'PENDING' => true, // always skip if not PENDING
-        default => strtotime($statusDateTime) + $jobInterval > $currentTimestamp,
-    };
+    if ($status !== 'PENDING') {
+        if ($status === 'PROCESSING' && strtotime($statusDateTime) + 10*60 < $currentTimestamp) { // over 10minutes of `processing` no response
+
+        } else if ($status === 'STARTED' && strtotime($statusDateTime) + 20*60 < $currentTimestamp) { // over 20minutes no uncompleted processes
+
+        } else {
+            return true;
+        }
+    }
+
+    if (strtotime($statusDateTime) + $jobInterval > $currentTimestamp) {
+        return true;
+    }
+
+    return false;
 }
 
 function createBatchItem(int $merchantId, string $site, int $cronId, string $module): array

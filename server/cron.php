@@ -17,8 +17,10 @@ try {
     foreach ($envs as $e) {
         postAndForget($self . '/crond/syncBetHistory.php?wEnv=' . $e);
     }
-    $now = Carbon\Carbon::now()->floorMinute()->format('H:i:s');
-    $logger->info("Cron run at $now syncBetHistory.php - " . json_encode($envs));
+    $floor = Carbon\Carbon::now()->floorMinute()->format('H:i:s');
+    $now = Carbon\Carbon::now()->format('H:i:s');
+
+    $logger->info("Cron syncBetHistory.php triggered at $now, floor minute $floor");
 } catch (Throwable $e) {
     $logger->error("Error at cron.php" . $e->getMessage(), [
         'message' => $e->getMessage(),
