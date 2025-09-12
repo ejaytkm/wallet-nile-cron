@@ -208,17 +208,27 @@ function shouldSkipJob($job, $jobC): bool
     $status = $job['status'] ?? '';
     $statusDateTime = $job['status_datetime'] ?? '';
     $executionDateTime = $job['execution_datetime'] ?? '';
-    $jobInterval = $jobC['interval'] ?? 60; // 60seconds default interval
+    $jobInterval = (int) $jobC['interval'] ?? 60; // 60seconds default interval
 
     if (empty($statusDateTime)) {
         return strtotime($executionDateTime) + $jobInterval > $currentTimestamp;
     }
 
-    return match (true) {
-        $status === 'PROCESSING' && strtotime($statusDateTime) + ($jobInterval * 2) < $currentTimestamp => false, // 10 minutes
-        $status !== 'PENDING' => true, // always skip if not PENDING
-        default => strtotime($statusDateTime) + $jobInterval > $currentTimestamp,
-    };
+    if ($status !== 'PENDING') {
+        if ($status === 'PROCESSING' && strtotime($statusDateTime) + 10*60 < $currentTimestamp) { // over 10minutes of `processing` no response
+
+        } else if ($status === 'STARTED' && strtotime($statusDateTime) + 20*60 < $currentTimestamp) { // over 20minutes no uncompleted processes
+
+        } else {
+            return true;
+        }
+    }
+
+    if (strtotime($statusDateTime) + $jobInterval > $currentTimestamp) {
+        return true;
+    }
+
+    return false;
 }
 
 function createBatchItem(int $merchantId, string $site, int $cronId, string $module): array
