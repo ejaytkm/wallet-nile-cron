@@ -48,8 +48,8 @@ foreach ($glodb->query($query) as $c) {
     $cron[$c['merchant_id']][$c['code']] = $c;
 }
 
-//$sql = "SELECT id FROM merchants WHERE status = 'ACTIVE'"; // TODO DEV FUTURE: enable all merchants & delete bottom line
-$sql = "SELECT id FROM merchants WHERE status = 'ACTIVE' AND (id BETWEEN 1 AND 71 OR id BETWEEN 1001 AND 1370);";
+$sql = "SELECT id FROM merchants WHERE status = 'ACTIVE'";
+//$sql = "SELECT id FROM merchants WHERE status = 'ACTIVE' AND (id BETWEEN 1 AND 71 OR id BETWEEN 1001 AND 1370);"; // revert back to testing
 $mIds = $wrodb->queryFirstColumn($sql);
 
 $batch = [];
