@@ -49,8 +49,7 @@ foreach ($glodb->query($query) as $c) {
 }
 
 //$sql = "SELECT id FROM merchants WHERE status = 'ACTIVE'"; // TODO DEV FUTURE: enable all merchants & delete bottom line
-//$sql = "SELECT id FROM merchants WHERE status = 'ACTIVE' AND (id BETWEEN 0 AND 71 OR id BETWEEN 1001 AND 1370);"; // TODO: DEV FUTURE after test
-$sql = "SELECT id FROM merchants WHERE status = 'ACTIVE' AND id IN (21,37,38,43,58,71,1370);";
+$sql = "SELECT id FROM merchants WHERE status = 'ACTIVE' AND (id BETWEEN 1 AND 71 OR id BETWEEN 1001 AND 1370);";
 $mIds = $wrodb->queryFirstColumn($sql);
 
 $batch = [];
